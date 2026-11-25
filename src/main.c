@@ -15,7 +15,7 @@
 
 #ifndef YABASIC_INCLUDED
 #include "yabasic.h"
-#include "rk_gui.h" /* all prototypes and structures */
+#include "rk_gui.h" /* Haiku graphic window bridge */
 #endif
 #include "bison.h"
 #include "rk_platform.h"
