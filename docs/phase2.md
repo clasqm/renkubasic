@@ -9,7 +9,7 @@ window. The yab widget layer (`src/yabcompat/`) is the next slice.
 | Piece | Where | State |
 | --- | --- | --- |
 | C bridge between the C core and the Haiku kits | `src/rk_gui.h` | done |
-| `BApplication`, `BWindow`, `BView`, `BBitmap` backend | `src/rk_gui.cpp` | done, unbuilt |
+| `BApplication`, `BWindow`, `BView`, `BBitmap` backend | `src/rk_gui.cpp` | first build round fixed, next build pending |
 | yabasic drawing commands on that bridge | `src/rk_graphics.c` | ported from 2.92.1 |
 | TrueType/OpenType font selection | `rk_gui_set_font()` | done |
 | `getbit$` / `putbit` | `rk_graphics.c` | ported, same `rgb W,H:` string format |
@@ -76,6 +76,51 @@ g0130's two `text` calls with an explicit font.
   has no file descriptor. `inkey$` therefore still waits on the terminal; a
   program that only expects window input needs a poll loop or a later change to
   `inkey`'s wait.
-* **No compiled build yet.** Per the project rules the maintainer builds on
-  Haiku. The first build of this slice will find API mistakes; they are expected
-  and get fixed in the next round.
+* **The close box is ignored.** `QuitRequested()` returns false. If the window
+  could be closed by hand it would be destroyed without telling the interpreter
+  thread, leaving dangling pointers in the bridge. Proper handling needs a
+  shutdown request that the interpreter loop checks, which belongs with the yab
+  window commands. A program closes the window with `close window`.
+
+## Build rounds
+
+**Round 1 (2026-11-25).** `main.c` failed in `rk_gui.h`:
+
+```
+src/rk_gui.h:71:39: error: expected declaration specifiers or '...' before 'cur_term'
+   71 | int rk_gui_mouse(int *x, int *y, int *buttons);
+```
+
+`yabasic.h` includes `<term.h>` before the bridge header, and terminfo defines
+`buttons` (the `btns` capability, "number of buttons on mouse") as
+`((TERMTYPE *)cur_term)->Numbers[…]`. The preprocessor therefore rewrote the
+parameter name. The parameters are now `out_x`/`out_y`/`out_buttons`, with a
+comment in the header saying why.
+
+Two more API mistakes were found by inspection against the Haiku headers in the
+same round:
+
+* `BWindow` has no `Invalidate()` method. `rk_gui_flush()` now invalidates the
+  display `BView` instead.
+* `BTranslatorRoster::Translate()` has no `BBitmap*` source overload, so
+  `rk_gui_save_png()` was passing a `BPositionIO*` in the wrong position. The
+  canvas now goes through a `BBitmapStream`, which must be detached again before
+  it is destroyed or it deletes the canvas.
+* `BFont` has no `SetFamily()`. `rk_gui_set_font()` now uses
+  `SetFamilyAndStyle(family, style)`, with a NULL style meaning the family's
+  default style, and starts from the current font so a size-only specification
+  keeps the family.
+
+Also in this round: the window frame is resized after `Show()` until its content
+area is exactly `width × height`, because the frame passed to `BWindow` includes
+the tab and border and would otherwise clip the right and bottom of the canvas;
+the display view is now non-resizable to match the fixed-size bitmap; `dot`
+fills a single pixel instead of drawing a two-pixel line; and an unset font can
+no longer be applied to a missing canvas view.
+
+What still has to be confirmed on the first successful build: whether a
+`BApplication` created on the interpreter thread accepts `Run()` on a helper
+thread (yab instead runs the application on the main thread and the interpreter
+on a helper), and whether `BBitmap::Lock()` around the blit is enough for the
+window thread's `Draw()`. If either fails, the fallback is to create the window
+on the GUI thread and post drawing requests to it.

@@ -23,6 +23,7 @@
 
 #include <Application.h>
 #include <Bitmap.h>
+#include <BitmapStream.h>
 #include <File.h>
 #include <Font.h>
 #include <Message.h>
@@ -42,6 +43,7 @@ namespace {
 
 BBitmap *g_canvas = NULL;
 BView *g_canvas_view = NULL;
+BView *g_display = NULL;
 BWindow *g_window = NULL;
 BApplication *g_app = NULL;
 BFont g_font;
@@ -131,9 +133,14 @@ public:
 class RkWindow : public BWindow {
 public:
   RkWindow(BRect frame, const char *title)
-      : BWindow(frame, title, B_TITLED_WINDOW, B_NOT_ZOOMABLE) {}
+      : BWindow(frame, title, B_TITLED_WINDOW,
+                B_NOT_ZOOMABLE | B_NOT_RESIZABLE) {}
 
-  bool QuitRequested() { return true; }
+  /* The canvas belongs to the program, which closes it with `close window`.
+     Refusing a stray click on the close box keeps the pointers in this file
+     valid: there is no safe way yet to tell the interpreter thread that the
+     window went away. yabcompat will need a real shutdown path. */
+  bool QuitRequested() { return false; }
 
   void MessageReceived(BMessage *message) {
     switch (message->what) {
@@ -251,7 +258,8 @@ int rk_gui_open_window(int width, int height, const char *title) {
 
   BRect frame(60, 60, 60 + width - 1, 60 + height - 1);
   RkWindow *window = new RkWindow(frame, title ? title : "RenkuBASIC");
-  window->AddChild(new RkDisplayView(frame.OffsetToCopy(B_ORIGIN)));
+  RkDisplayView *display = new RkDisplayView(canvas_rect);
+  window->AddChild(display);
   window->Show();
 
   /* Wait until the looper really handles the window, so the first drawing is
@@ -259,6 +267,15 @@ int rk_gui_open_window(int width, int height, const char *title) {
   bool up = false;
   for (int i = 0; i < 200; i++) {
     if (window->LockWithTimeout(10000) == B_OK) {
+      /* The frame above is the outer window frame, so the tab and border eat
+         into the content area. Grow it until the view is exactly the size of
+         the canvas, otherwise the right and bottom edges are clipped. */
+      BRect inner = window->Bounds();
+      float dw = (float)width - (inner.Width() + 1.0f);
+      float dh = (float)height - (inner.Height() + 1.0f);
+      if (dw != 0.0f || dh != 0.0f) {
+        window->ResizeBy(dw, dh);
+      }
       window->Unlock();
       up = true;
       break;
@@ -274,6 +291,7 @@ int rk_gui_open_window(int width, int height, const char *title) {
 
   g_canvas = canvas;
   g_canvas_view = canvas_view;
+  g_display = display;
   g_window = window;
   g_width = width;
   g_height = height;
@@ -292,6 +310,7 @@ void rk_gui_close_window(void) {
 
   g_canvas = NULL;
   g_canvas_view = NULL;
+  g_display = NULL;
   g_window = NULL;
   g_width = g_height = 0;
 
@@ -332,11 +351,13 @@ void rk_gui_clear(void) {
 }
 
 void rk_gui_flush(void) {
-  if (!g_window) {
+  if (!g_window || !g_display) {
     return;
   }
   if (g_window->LockWithTimeout(100000) == B_OK) {
-    g_window->Invalidate();
+    /* BWindow has no Invalidate(); the canvas view marks itself dirty and the
+       window thread redraws it from the bitmap. */
+    g_display->Invalidate();
     g_window->Unlock();
   }
 }
@@ -393,21 +414,18 @@ void rk_gui_set_font(const char *spec) {
     }
   }
 
-  BFont font(*be_plain_font);
+  /* Start from the current font, so a specification that only gives a size
+     keeps the family. BFont has no SetFamily(); a NULL style asks app_server
+     for the family's default style. */
+  BFont font(g_font);
   if (family[0]) {
-    status_t status = B_NAME_NOT_FOUND;
-    if (style[0]) {
-      status = font.SetFamilyAndStyle(family, style);
-    }
+    status_t status = font.SetFamilyAndStyle(family, style[0] ? style : NULL);
     if (status != B_OK) {
-      status = font.SetFamily(family);
-    }
-    if (status != B_OK) {
-      /* Unknown family: keep the previous family but honour the size below. */
+      /* Unknown family or style: keep the previous font, but honour the size. */
       font = g_font;
       font.SetSize(size);
       g_font = font;
-      if (g_canvas) {
+      if (g_canvas && g_canvas_view) {
         g_canvas->Lock();
         g_canvas_view->SetFont(&g_font);
         g_canvas->Unlock();
@@ -447,8 +465,9 @@ void rk_gui_point(double x, double y) {
   }
   g_canvas->Lock();
   g_canvas_view->SetHighColor(g_fore);
-  g_canvas_view->StrokeLine(BPoint((float)x, (float)y),
-                            BPoint((float)x + 1, (float)y));
+  /* A one-pixel rectangle: StrokeLine would draw two pixels, and yabasic's
+     dot is a single pixel. */
+  g_canvas_view->FillRect(BRect((float)x, (float)y, (float)x, (float)y));
   g_canvas->Unlock();
 }
 
@@ -579,8 +598,14 @@ int rk_gui_save_png(const char *path) {
     set_error("could not create the screenshot file");
     return 0;
   }
+  /* BTranslatorRoster only translates from a BPositionIO; BBitmapStream
+     presents the canvas as one. It owns the bitmap it is given, so detach it
+     again or the canvas would be deleted with the stream. */
   g_canvas->Lock();
-  status_t status = roster->Translate(g_canvas, NULL, NULL, &file, B_PNG_FORMAT);
+  BBitmapStream stream(g_canvas);
+  status_t status = roster->Translate(&stream, NULL, NULL, &file, B_PNG_FORMAT);
+  BBitmap *detached = NULL;
+  stream.DetachBitmap(&detached);
   g_canvas->Unlock();
   if (status != B_OK) {
     set_error("could not encode the screenshot as PNG");
@@ -618,15 +643,15 @@ int rk_gui_next_key(char *out, int outlen) {
   return 1;
 }
 
-int rk_gui_mouse(int *x, int *y, int *buttons) {
-  if (x) {
-    *x = g_mouse_x;
+int rk_gui_mouse(int *out_x, int *out_y, int *out_buttons) {
+  if (out_x) {
+    *out_x = g_mouse_x;
   }
-  if (y) {
-    *y = g_mouse_y;
+  if (out_y) {
+    *out_y = g_mouse_y;
   }
-  if (buttons) {
-    *buttons = g_mouse_buttons;
+  if (out_buttons) {
+    *out_buttons = g_mouse_buttons;
   }
   return 1;
 }

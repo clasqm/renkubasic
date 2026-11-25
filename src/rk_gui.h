@@ -68,7 +68,9 @@ int rk_gui_key_pending(void);
 /* Copy the next key (yabasic name for special keys, else the character) into
    out; returns 1 when a key was available. */
 int rk_gui_next_key(char *out, int outlen);
-int rk_gui_mouse(int *x, int *y, int *buttons);
+/* Parameter names below are prefixed because this header is included after
+   <term.h>/<curses.h>, whose capability macros include "buttons". */
+int rk_gui_mouse(int *out_x, int *out_y, int *out_buttons);
 
 #ifdef __cplusplus
 }
