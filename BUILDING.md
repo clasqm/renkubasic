@@ -339,12 +339,18 @@ directive in the test header, and every skip prints its reason.
 * Acceptance: suites are runnable against an existing `yabasic` 2.92.1 binary and pass
   except tests marked `@requires: renkubasic`.
 
-**Phase 1 — core compiles (next)**
+**Phase 1 — core compiles (in progress)**
 
-* CMake project; core builds on Haiku without X11/Windows code, with the stubbed
-  Haiku platform seam (graphic window may be a no-op in this phase; CLI must work).
-* `bind` gone; renames applied; `peek$("os")`/`peek$("yabos")` implemented.
-* Acceptance: faultless build; `tests/run-tests.sh --suite cli` passes on Haiku.
+* [x] CMake project; `src/` holds the core; Windows and X11 backends deleted, the
+  platform seam (`src/rk_platform.*`) and a Phase 1 graphic placeholder
+  (`src/rk_graphics.c`) keep the interpreter linkable. See `docs/phase1.md`.
+* [x] `bind` gone (statement, `--bind`/`-bind`, bound-program loader, `whereami.c`);
+  renames applied; `peek$("os")`/`peek$("yabos")`/`peek$("renkuversion")` and
+  `--yab-os-names` implemented.
+* [ ] First build on Haiku: fix the compiler errors reported by the maintainer.
+* [ ] `tests/run-tests.sh --suite cli` green on Haiku (FFI test skips until
+  `-DRK_WITH_FFI=ON` is used).
+* Acceptance: faultless build; CLI suite passes on Haiku.
 
 **Phase 2 — Haiku/RenkuOS API and GUI**
 
@@ -407,8 +413,9 @@ Proposed:
   ncurses cursor/colour backend → same API on Haiku's ncurses (kept, not removed).
 * *Keep*: `system`/`system$` (POSIX process spawn), `peek$("os")` = `"unix"` as a name.
 
-**Q3 — `peek$("os")` spelling.** *(open: the question was skipped; the proposal below is
-the default until confirmed before Phase 2 ships.)*
+**Q3 — `peek$("os")` spelling.** **APPROVED 2026-11-25: lowercase `haiku`/`renkuos`,
+`peek$("yabos")` returns `"Haiku"`, and `--yab-os-names` restores `"Haiku"` for old yab
+programs.**
 The brief asks for `"haiku"`/`"renkuos"`; yab programs compare with `"Haiku"`. Proposal:
 `peek$("os")` returns the lowercase names as specified, `peek$("yabos")` returns the yab
 spelling, and `--yab-os-names` makes `peek$("os")` return `"Haiku"` for the whole run so
