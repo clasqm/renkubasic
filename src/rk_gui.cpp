@@ -8,10 +8,12 @@
 
     Design notes
     ------------
-    * One BApplication for the whole process (BUILDING.md decision D6). It is
-      created on first use and its message loop runs on a helper thread, because
-      the interpreter owns the main thread for the whole program. Every window
-      operation from the interpreter takes the window lock.
+    * One BApplication for the whole process (BUILDING.md decision D6). The
+      interpreter owns the main thread for the whole program, so the
+      application is both constructed and run on a helper thread. It has to be
+      the same thread: a BLooper is left locked by the thread that constructs
+      it, and BLooper::Loop() asserts that lock before entering the loop. Every
+      window operation from the interpreter takes the window lock.
     * All drawing goes into an offscreen B_RGB32 BBitmap. The window's view only
       blits that bitmap, so getbit$ and screenshots read a stable canvas and
       redraws on expose need no primitive replay. The pixel buffer is also what
@@ -46,6 +48,8 @@ BView *g_canvas_view = NULL;
 BView *g_display = NULL;
 BWindow *g_window = NULL;
 BApplication *g_app = NULL;
+sem_id g_app_ready = -1;
+bool g_app_spawned = false;
 BFont g_font;
 rgb_color g_fore = {0, 0, 0, 255};
 rgb_color g_back = {255, 255, 255, 255};
@@ -67,6 +71,22 @@ int g_mouse_buttons = 0;
 
 void set_error(const char *text) {
   snprintf(g_error, sizeof(g_error), "%s", text ? text : "");
+}
+
+/* RK_GUI_TRACE=1 writes every step that can block to stderr. The test runner
+   sets it for its capability probes, so a probe that stops in the backend says
+   which call it stopped in instead of leaving an empty log behind. */
+int g_trace = -1;
+
+void trace(const char *step) {
+  if (g_trace < 0) {
+    const char *env = getenv("RK_GUI_TRACE");
+    g_trace = (env && *env && strcmp(env, "0") != 0) ? 1 : 0;
+  }
+  if (g_trace) {
+    fprintf(stderr, "rk_gui: %s\n", step);
+    fflush(stderr);
+  }
 }
 
 bool queue_key(const char *name) {
@@ -183,23 +203,70 @@ public:
 };
 
 int32 gui_thread(void *data) {
-  BApplication *app = (BApplication *)data;
-  app->Run();
+  (void)data;
+  /* The application is built here, on the thread that runs its message loop.
+     BLooper's constructor locks the new looper and leaves it locked by the
+     calling thread; BLooper::Run() -> Loop() asserts that lock. Constructing
+     the application on the interpreter thread and only calling Run() here made
+     that assertion fail: debugger() suspended this thread, so the application
+     loop never started and nobody ever read the application's port. Windows
+     still appeared (each has its own thread), which is why the failure looked
+     like a random hang instead of an error. */
+  BApplication *app = new BApplication("application/x-vnd.RenkuBASIC");
+  if (app->InitCheck() == B_OK) {
+    g_app = app;
+  } else {
+    /* A failed application object is left alone on purpose: the process is
+       about to report that it cannot open a window anyway. */
+    set_error("the application could not be registered with app_server");
+  }
+  if (g_app_ready >= 0) {
+    release_sem(g_app_ready);
+  }
+  if (g_app) {
+    trace("application loop starting");
+    app->Run();
+  }
   return 0;
 }
 
-void ensure_app() {
+bool ensure_app(void) {
   if (g_app) {
-    return;
+    return true;
   }
-  g_app = new BApplication("application/x-vnd.RenkuBASIC");
+  if (g_app_spawned) {
+    if (!g_error[0]) {
+      set_error("the application is not running");
+    }
+    return false;
+  }
+  g_app_spawned = true;
+  g_app_ready = create_sem(0, "RenkuBASIC GUI ready");
+  if (g_app_ready < 0) {
+    set_error("could not create the GUI start semaphore");
+    return false;
+  }
   thread_id thread = spawn_thread(gui_thread, "RenkuBASIC GUI", B_NORMAL_PRIORITY,
-                                  g_app);
-  if (thread >= 0) {
-    resume_thread(thread);
-    /* Give the looper a moment to start; BWindow creation below retries. */
-    usleep(20000);
+                                  NULL);
+  if (thread < 0) {
+    set_error("could not start the GUI thread");
+    return false;
   }
+  resume_thread(thread);
+  /* Wait for the application object, but never forever: a headless or wedged
+     app_server has to produce an error, not a hung program (and a hung test). */
+  if (acquire_sem_etc(g_app_ready, 1, B_RELATIVE_TIMEOUT, 10000000) != B_OK) {
+    set_error("could not start the application (is app_server reachable?)");
+    return false;
+  }
+  if (!g_app) {
+    if (!g_error[0]) {
+      set_error("the application could not be started");
+    }
+    return false;
+  }
+  trace("application ready");
+  return true;
 }
 
 void trim(char *text) {
@@ -238,8 +305,11 @@ int rk_gui_open_window(int width, int height, const char *title) {
     return 0;
   }
   set_error("");
-  ensure_app();
+  if (!ensure_app()) {
+    return 0;
+  }
 
+  trace("open: creating canvas");
   BRect canvas_rect(0, 0, width - 1, height - 1);
   BBitmap *canvas = new BBitmap(canvas_rect, B_RGB32, true);
   if (!canvas || canvas->InitCheck() != B_OK) {
@@ -256,14 +326,17 @@ int rk_gui_open_window(int width, int height, const char *title) {
   canvas_view->SetDrawingMode(B_OP_COPY);
   canvas->Unlock();
 
+  trace("open: creating window");
   BRect frame(60, 60, 60 + width - 1, 60 + height - 1);
   RkWindow *window = new RkWindow(frame, title ? title : "RenkuBASIC");
   RkDisplayView *display = new RkDisplayView(canvas_rect);
   window->AddChild(display);
+  trace("open: showing window");
   window->Show();
 
   /* Wait until the looper really handles the window, so the first drawing is
      not lost. LockWithTimeout keeps a broken app_server from hanging us. */
+  trace("open: waiting for the window lock");
   bool up = false;
   for (int i = 0; i < 200; i++) {
     if (window->LockWithTimeout(10000) == B_OK) {
@@ -284,7 +357,10 @@ int rk_gui_open_window(int width, int height, const char *title) {
   }
   if (!up) {
     set_error("could not start the window (is app_server reachable?)");
-    delete window;
+    /* The window's looper is running but did not answer, and deleting a
+       running BLooper is a debugger() call, so it is left to the process
+       exit. The canvas can go: the display view reads g_canvas, which is
+       still NULL, and the canvas owns its own view. */
     delete canvas;
     return 0;
   }
@@ -300,6 +376,7 @@ int rk_gui_open_window(int width, int height, const char *title) {
   g_canvas->Lock();
   g_canvas_view->SetFont(&g_font);
   g_canvas->Unlock();
+  trace("open: done");
   return 1;
 }
 
@@ -315,10 +392,20 @@ void rk_gui_close_window(void) {
   g_width = g_height = 0;
 
   if (window) {
-    if (window->LockWithTimeout(100000) == B_OK) {
+    trace("close: locking window");
+    if (window->LockWithTimeout(200000) == B_OK) {
+      /* BWindow::Quit() requires the lock and releases it fully before it
+         waits for the window thread, so holding it here is correct. */
+      trace("close: quitting window");
       window->Quit();
+      trace("close: window gone");
     } else {
-      window->PostMessage(B_QUIT_REQUESTED);
+      /* The window thread never gave the lock up. Destroying the canvas it may
+         still be reading would be worse than leaking both, and the globals are
+         already cleared, so nothing else can reach them. */
+      set_error("the window did not respond to close window");
+      trace("close: window lock timed out, leaving window and canvas alone");
+      return;
     }
   }
   if (canvas) {
@@ -617,12 +704,13 @@ int rk_gui_save_png(const char *path) {
 void rk_gui_screen_size(int *width, int *height) {
   int w = 1920;
   int h = 1080;
-  ensure_app();
-  BScreen screen;
-  if (screen.IsValid()) {
-    BRect frame = screen.Frame();
-    w = (int)frame.Width() + 1;
-    h = (int)frame.Height() + 1;
+  if (ensure_app()) {
+    BScreen screen;
+    if (screen.IsValid()) {
+      BRect frame = screen.Frame();
+      w = (int)frame.Width() + 1;
+      h = (int)frame.Height() + 1;
+    }
   }
   if (width) {
     *width = w;

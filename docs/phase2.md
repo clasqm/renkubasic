@@ -9,7 +9,7 @@ window. The yab widget layer (`src/yabcompat/`) is the next slice.
 | Piece | Where | State |
 | --- | --- | --- |
 | C bridge between the C core and the Haiku kits | `src/rk_gui.h` | done |
-| `BApplication`, `BWindow`, `BView`, `BBitmap` backend | `src/rk_gui.cpp` | compiles on Haiku; runtime not yet exercised |
+| `BApplication`, `BWindow`, `BView`, `BBitmap` backend | `src/rk_gui.cpp` | compiles on Haiku; the open/close probe passed once (round 3), drawing not yet confirmed |
 | yabasic drawing commands on that bridge | `src/rk_graphics.c` | ported from 2.92.1 |
 | TrueType/OpenType font selection | `rk_gui_set_font()` | done |
 | `getbit$` / `putbit` | `rk_graphics.c` | ported, same `rgb W,H:` string format |
@@ -31,14 +31,14 @@ primitive replay, `getbit$` reads a stable picture, and `putbit` writes into the
 same pixels it later reads back. Pixel access is direct through `Bits()` with
 `BytesPerRow()`; the layout on little-endian Haiku is B, G, R, A.
 
-**One BApplication, message loop on a helper thread.** Decision D6 says one
+**One BApplication, built and run on one helper thread.** Decision D6 says one
 application object for both the graphic window and yab widgets. The interpreter
-owns the main thread for the whole program, so the application's looper runs on
-a helper thread and every window operation from the interpreter takes the window
-lock. This is the part of the design most likely to need adjustment on a real
-Haiku system; if the app_server rejects window creation from the interpreter
-thread, the fix is to create the window on the GUI thread and post the
-interpreter's drawing requests to it.
+owns the main thread for the whole program, so the application lives on a
+helper thread; what matters is that the *same* thread constructs it and calls
+`Run()` (round 4 explains why). Every window operation from the interpreter
+takes the window lock. If app_server turns out to reject window creation from
+the interpreter thread, the fallback is to create the window on the GUI thread
+and post the interpreter's drawing requests to it.
 
 **TrueType only.** A font specification is `"Family, Style, Size"`, any part
 optional; an unknown family keeps the previous family and still applies the
@@ -59,6 +59,12 @@ two tests run as soon as the backend works, while the yab-widget tests keep
 skipping until `src/yabcompat/` exists. That keeps the suite honest in both
 directions: no false passes, and no failing tests for features that are simply
 not written yet.
+
+The probe is the first thing that touches the backend, so a failing probe used
+to turn every graphical test into a bare `SKIP (requires graphics)` with no
+explanation. Probes now run with `RK_GUI_TRACE=1`, under the same kind of
+watchdog as a test, and their log is printed when they fail. The banner also
+reports `graphics` next to `gui`, because those are separate capabilities.
 
 `g0103-fonts.yab` (TrueType metrics through yab's `draw get`) stays with the yab
 layer, because it uses yab syntax; the yabasic equivalent is exercised by
@@ -146,3 +152,54 @@ application on the main thread and the interpreter on a helper), and whether
 `BBitmap::Lock()` around the blit is enough for the window thread's `Draw()`. If
 either fails, the fallback is to create the window on the GUI thread and post
 drawing requests to it.
+
+**Round 4 (2026-11-25, second run on Haiku).** Same build, same CLI suite
+(39 passed), but this time the graphics probe did not come back: bash reported
+the probe's own line as killed, so no test ran at all and the suite turned into
+17 skips with `(requires graphics)`. Together with round 3 — where the same
+probe passed and only `g0130` hung — that is a race inside the backend, not in
+the tests.
+
+Haiku's source names it. `BLooper::_InitData()` ends with
+`gLooperList.AddLooper(this)`, commented "this will also lock this looper": a
+new looper stays **locked by the thread that constructed it**. `Run()`, `Loop()`
+and `AddHandler()` all begin with `AssertLocked()`, and `BLooper::Loop()` records
+`find_thread(NULL)` as the loop thread. The old `ensure_app()` did
+
+```cpp
+g_app = new BApplication("application/x-vnd.RenkuBASIC");   /* interpreter thread */
+spawn_thread(gui_thread, ..., g_app);                       /* helper thread */
+```
+
+so `Run()` on the helper asked `IsLocked()`, found the lock owned by the
+interpreter thread, and called `debugger("looper must be locked before
+proceeding")`. With no debugger installed that suspends the helper thread for
+good: the application's message loop never runs and nobody reads the
+application's port. Windows still appear, because every `BWindow` has its own
+looper thread started by `Show()`, which is why the symptom moved between runs
+instead of failing outright — but an application port that is never drained is
+exactly what makes an app_server round trip in `open window` or `close window`
+stop answering.
+
+The application is now constructed *inside* `gui_thread()`, on the thread that
+calls `Run()`, and the interpreter waits for it on a semaphore with a ten second
+timeout instead of the old fixed `usleep(20000)`. A failed `InitCheck()` or a
+timeout is reported through `rk_gui_last_error()`, so a machine without a
+reachable app_server says "could not start the application (is app_server
+reachable?)" instead of hanging. `rk_gui_open_window()` now honours that failure
+rather than carrying on into `new BWindow`, whose `be_app == NULL` check is
+another `debugger()`.
+
+Two smaller changes in the same round:
+
+* `rk_gui_close_window()` lost its silent fallback, which deleted the canvas
+  under a window whose lock it could not take. On a lock timeout it records the
+  error and leaves both alone: leaking is better than a window thread drawing
+  through a freed bitmap.
+* `RK_GUI_TRACE=1` makes the backend print each blocking step of open and close
+  to stderr, and the runner sets it for its probes (see Tests).
+
+What the next run has to confirm: that the probe passes on repeated runs rather
+than sometimes, and that `g0130` gets past `open window`. Its trace file
+`tests/.scratch/run/g0130-yabasic-graphics/g0130-trace.txt` will then name the
+next statement that does not return, if there is one.

@@ -173,20 +173,48 @@ fi
 
 mkdir -p "$SCRATCH" "$SCRATCH_RUN"
 
+# A capability probe is a tiny program that opens and closes a window. It runs
+# with RK_GUI_TRACE=1, so a backend that stalls names the call it stopped in,
+# and under a watchdog, so a stalled probe cannot hang the whole run. When a
+# probe fails its log is printed: a skip with no reason is not diagnosable.
+PROBE_TIMEOUT=20
+run_probe() {  # probe-file log-file
+  local probe="$1"
+  local log="$2"
+  local pid watchdog status
+  ( cd "$SCRATCH_RUN" && RK_GUI_TRACE=1 exec "$INTERP" "$probe" ) \
+    >"$log" 2>&1 &
+  pid=$!
+  ( sleep "$PROBE_TIMEOUT"; kill -9 "$pid" 2>/dev/null ) >/dev/null 2>&1 &
+  watchdog=$!
+  wait "$pid"
+  status=$?
+  kill "$watchdog" 2>/dev/null
+  wait "$watchdog" 2>/dev/null
+  return $status
+}
+
+probe_note() {  # label log-file
+  echo "note: the $1 probe failed, so its tests skip. Probe output:"
+  if [ -s "$2" ]; then
+    tail -n 12 "$2" | sed 's/^/    /'
+  else
+    echo "    (empty)"
+  fi
+}
+
 GUI_OK=0
 probe_gui() {
   local probe="$SCRATCH/gui-probe.yab"
-  local log="$SCRATCH/gui-probe.log"
   cat > "$probe" <<'PROBE'
 window open 20, 20 to 90, 90, "rkprobe", "RenkuBASIC probe"
 window close "rkprobe"
 exit 0
 PROBE
-  ( cd "$SCRATCH_RUN" && "$INTERP" "$probe" >"$log" 2>&1 )
-  return $?
+  run_probe "$probe" "$SCRATCH/gui-probe.log"
 }
 if [ "$IS_RENKU" = "1" ]; then
-  if probe_gui; then GUI_OK=1; fi
+  if probe_gui; then GUI_OK=1; else probe_note gui "$SCRATCH/gui-probe.log"; fi
 else
   # A plain yabasic cannot run the yab window commands, so the GUI suite is
   # meaningless. Do not spend a window on it.
@@ -198,17 +226,22 @@ fi
 GRAPHICS_OK=0
 probe_graphics() {
   local probe="$SCRATCH/graphics-probe.yab"
-  local log="$SCRATCH/graphics-probe.log"
   cat > "$probe" <<'PROBE'
 open window 20, 20
 close window
 exit 0
 PROBE
-  ( cd "$SCRATCH_RUN" && "$INTERP" "$probe" >"$log" 2>&1 )
+  run_probe "$probe" "$SCRATCH/graphics-probe.log"
 }
 if [ "$IS_RENKU" = "1" ]; then
   case " $SUITE_DIRS " in
-    *" gui "*) if probe_graphics; then GRAPHICS_OK=1; fi ;;
+    *" gui "*)
+      if probe_graphics; then
+        GRAPHICS_OK=1
+      else
+        probe_note graphics "$SCRATCH/graphics-probe.log"
+      fi
+      ;;
   esac
 fi
 
@@ -280,6 +313,7 @@ echo "  interpreter : $INTERP"
 echo "  os          : $OSNAME"
 echo "  suites      : $SUITE_DIRS"
 echo "  gui         : $([ "$GUI_OK" = "1" ] && echo available || echo unavailable)"
+echo "  graphics    : $([ "$GRAPHICS_OK" = "1" ] && echo available || echo unavailable)"
 echo "  pty         : $([ "$HAS_PTY" = "1" ] && echo available || echo unavailable)"
 echo
 
