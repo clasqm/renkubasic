@@ -91,3 +91,40 @@ tests/run-tests.sh --interpreter build/renkubasic --suite cli
   compile error.
 * `tests/run-tests.sh` calls the interpreter directly; if the binary is not
   executable from the repository root, pass an absolute path.
+
+## Acceptance (2026-11-25)
+
+Accepted on Haiku: `mkdir build && cd build && cmake .. && make` completes with
+no warnings, and the CLI suite is green.
+
+```
+$ tests/run-tests.sh --interpreter build/renkubasic --suite cli
+Summary: 39 passed, 0 failed, 2 skipped
+```
+
+The skips are expected, not failures: `c097-ffi` needs `-DRK_WITH_FFI=ON` and
+`c096-tty-at-colour` needs a pty. The GUI suite stays unavailable until phase 2
+supplies a window backend — the runner detects that by trying to open a window,
+so it reports "gui: unavailable" instead of false passes.
+
+### Defects found by the first builds
+
+Three build rounds and one test round, all fixed:
+
+1. `io.c` still called `XPending()`/`ConnectionNumber()` on an X11 `Display`.
+   Window input now goes through `rk_window_fd()`/`rk_window_pending()`, which
+   return -1/0 until phase 2.
+2. ncurses defines `ERR` and `EOF` as the same value, so the placeholder's key
+   mapping had a duplicate `case`.
+3. The placeholder declared `backpid = 0`; `end_it()` reads 0 as "this process
+   is the background redraw helper" and calls `exit(1)`. Every program that
+   finished normally therefore exited 1. Upstream declares it -1.
+4. `peek$("directory")` was missing from the rewritten `peek2()`; yab 1.8.3's
+   `Examples/Version.yab` prints it.
+5. The test runner kept a relative `--interpreter` path while changing into each
+   test's scratch directory, so every test exited 127.
+
+Two further failures were mistakes in the tests themselves, not the
+interpreter: `assert_eq()` was given string arguments (it takes numbers), and
+`c083-yab-peeks` asserted yab widget/file extras that belong to phase 3; it now
+covers the string peeks phase 1 provides.

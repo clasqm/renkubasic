@@ -339,7 +339,7 @@ directive in the test header, and every skip prints its reason.
 * Acceptance: suites are runnable against an existing `yabasic` 2.92.1 binary and pass
   except tests marked `@requires: renkubasic`.
 
-**Phase 1 — core compiles (in progress)**
+**Phase 1 — core compiles (complete 2026-11-25)**
 
 * [x] CMake project; `src/` holds the core; Windows and X11 backends deleted, the
   platform seam (`src/rk_platform.*`) and a Phase 1 graphic placeholder
@@ -347,10 +347,12 @@ directive in the test header, and every skip prints its reason.
 * [x] `bind` gone (statement, `--bind`/`-bind`, bound-program loader, `whereami.c`);
   renames applied; `peek$("os")`/`peek$("yabos")`/`peek$("renkuversion")` and
   `--yab-os-names` implemented.
-* [ ] First build on Haiku: fix the compiler errors reported by the maintainer.
-* [ ] `tests/run-tests.sh --suite cli` green on Haiku (FFI test skips until
-  `-DRK_WITH_FFI=ON` is used).
-* Acceptance: faultless build; CLI suite passes on Haiku.
+* [x] First build on Haiku: compiler errors found and fixed in three rounds
+  (recorded in `docs/phase1.md`).
+* [x] `tests/run-tests.sh --suite cli` green on Haiku (2026-11-25):
+  39 passed, 0 failed, 2 skipped (`c097-ffi` needs `-DRK_WITH_FFI=ON`,
+  `c096-tty-at-colour` needs a pty).
+* Acceptance met: faultless build; CLI suite passes on Haiku.
 
 **Phase 2 — Haiku/RenkuOS API and GUI**
 
