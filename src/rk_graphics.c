@@ -166,8 +166,7 @@ void gettermkey(char *retkey) {
   case KEY_END:
     strcpy(retkey, ykey[kEND] ? ykey[kEND] : "end");
     break;
-  case ERR:
-  case EOF:
+  case ERR: /* also EOF */
     break;
   default:
     if (c < 256) {

@@ -37,6 +37,8 @@ int last_frnfn_call_okay = 1; /* true, if last foreign call has been okay */
 /* ------------- define a stub only, if feature is not available
  * ---------------- */
 
+void no_frn_error(void); /* defined below when the FFI is off */
+
 #if defined(UNIX) && !defined(USE_DL_FFI)
 void no_frn_error(void) {
   error(sERROR,
