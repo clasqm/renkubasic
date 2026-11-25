@@ -377,8 +377,8 @@ void rk_gui_set_background(int r, int g, int b) {
 }
 
 void rk_gui_set_font(const char *spec) {
-  char family[128] = "";
-  char style[128] = "";
+  char family[256] = "";
+  char style[256] = "";
   float size = 12.0f;
   char buffer[256];
 

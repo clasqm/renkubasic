@@ -9,7 +9,7 @@ window. The yab widget layer (`src/yabcompat/`) is the next slice.
 | Piece | Where | State |
 | --- | --- | --- |
 | C bridge between the C core and the Haiku kits | `src/rk_gui.h` | done |
-| `BApplication`, `BWindow`, `BView`, `BBitmap` backend | `src/rk_gui.cpp` | first build round fixed, next build pending |
+| `BApplication`, `BWindow`, `BView`, `BBitmap` backend | `src/rk_gui.cpp` | compiles on Haiku; runtime not yet exercised |
 | yabasic drawing commands on that bridge | `src/rk_graphics.c` | ported from 2.92.1 |
 | TrueType/OpenType font selection | `rk_gui_set_font()` | done |
 | `getbit$` / `putbit` | `rk_graphics.c` | ported, same `rgb W,H:` string format |
@@ -118,9 +118,15 @@ the display view is now non-resizable to match the fixed-size bitmap; `dot`
 fills a single pixel instead of drawing a two-pixel line; and an unset font can
 no longer be applied to a missing canvas view.
 
-What still has to be confirmed on the first successful build: whether a
-`BApplication` created on the interpreter thread accepts `Run()` on a helper
-thread (yab instead runs the application on the main thread and the interpreter
-on a helper), and whether `BBitmap::Lock()` around the blit is enough for the
-window thread's `Draw()`. If either fails, the fallback is to create the window
-on the GUI thread and post drawing requests to it.
+**Round 2 (2026-11-25).** The build succeeds: all C sources and `rk_gui.cpp`
+compile with gcc 15.3 and `renkubasic` links against `libbe` and
+`libtranslation`. Two warnings were removed: unused `r, g, b` variables left in
+`putbit` by the Xlib port, and a possible `snprintf` truncation when splitting
+the font specification.
+
+What the first run has yet to confirm: whether a `BApplication` created on the
+interpreter thread accepts `Run()` on a helper thread (yab instead runs the
+application on the main thread and the interpreter on a helper), and whether
+`BBitmap::Lock()` around the blit is enough for the window thread's `Draw()`. If
+either fails, the fallback is to create the window on the GUI thread and post
+drawing requests to it.

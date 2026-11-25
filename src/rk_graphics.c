@@ -726,7 +726,6 @@ void putbit(void) {
   int xe, ye, we, he;
   int x, y, xdest, ydest, w, h, n;
   unsigned short red, green, blue;
-  int r, g, b;
 
   mode = pop(stSTRING)->pointer;
   if (print_to_file) {
