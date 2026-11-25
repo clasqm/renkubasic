@@ -22,7 +22,7 @@ assert_true(len(peek$("version")) > 0, "peek$('version')")
 
 // RenkuOS/Haiku names for OS detection, added in phase 1 (decision Q3).
 assert_true(peek$("os") = "haiku" or peek$("os") = "renkuos", "peek$('os')")
-assert_eq(peek$("yabos"), "Haiku", "peek$('yabos')")
+assert_true(peek$("yabos") = "Haiku", "peek$('yabos')")
 
 print "c083 done"
 exit 0
