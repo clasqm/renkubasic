@@ -56,7 +56,6 @@ int termpid = 0;
 int backpid = 0;
 
 static char *printerfilename = NULL;
-static int openwin_font = 0;
 
 /* ------------- helpers ---------------- */
 
@@ -87,7 +86,11 @@ static void rk_print_footer(void) {
 
 /* ------------- window ---------------- */
 
-void create_openwin(int fnt) { openwin_font = fnt; }
+void create_openwin(int fnt) {
+  /* The optional font argument of `open window` is applied by the phase 2
+     backend; there is nothing to remember here yet. */
+  (void)fnt;
+}
 
 void openwin(struct command *cmd) {
   double h, w;

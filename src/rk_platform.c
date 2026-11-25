@@ -120,3 +120,15 @@ int rk_graphics_available(void) {
      commands must say so rather than silently drawing into nothing. */
   return FALSE;
 }
+
+int rk_window_fd(void) {
+  /* A Haiku BWindow is not a file descriptor; phase 2 will either poll its
+     message port from here or return -1 and let the application poll through
+     rk_window_pending(). */
+  return -1;
+}
+
+int rk_window_pending(void) {
+  /* No window backend yet, so no window key can be waiting. */
+  return FALSE;
+}

@@ -363,8 +363,9 @@ char *inkey(double maxtime) /* get char from keyboard */
   /* Initialization */
 #ifdef UNIX
 
-  /* events */
-  winfd = (winopened && display) ? ConnectionNumber(display) : 0;
+  /* events: the graphic window reports a descriptor, or -1 when this build
+     has no window backend */
+  winfd = rk_window_fd();
   termfd = fileno(stdin);
   maxfd = (termfd > winfd) ? termfd : winfd;
 
@@ -402,7 +403,7 @@ char *inkey(double maxtime) /* get char from keyboard */
 
     /* already got key ? */
 #ifdef UNIX
-    if (winopened && display && XPending(display)) {
+    if (rk_window_pending()) {
       getwinkey(retkey);
       if (retkey[0]) {
         break;
@@ -411,7 +412,7 @@ char *inkey(double maxtime) /* get char from keyboard */
 
     /* prepare to wait for key */
     FD_ZERO(&readfds);
-    if (winfd) {
+    if (winfd >= 0) {
       FD_SET(winfd, &readfds);
     }
     FD_SET(termfd, &readfds);
@@ -459,7 +460,7 @@ char *inkey(double maxtime) /* get char from keyboard */
 #ifdef UNIX
     if (FD_ISSET(termfd, &readfds)) {
       gettermkey(retkey);
-    } else if (FD_ISSET(winfd, &readfds)) {
+    } else if (winfd >= 0 && FD_ISSET(winfd, &readfds)) {
       getwinkey(retkey);
     }
 #elif WINDOWS

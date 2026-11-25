@@ -61,7 +61,6 @@ void create_docu_array(void);
 int equal(char *, char *, int);
 void put_and_count(char *, FILE *, int *);
 char *find_interpreter(char *);
-static int seekback(FILE *, int, int);
 int effective_lineno(void);
 
 /* ------------- global variables ---------------- */
@@ -83,7 +82,6 @@ int con_fore_col = -1;          /* console foreground color */
 int con_back_col = -1;          /* console background color */
 int interactive;                /* true, if commands come from stdin */
 int is_bound;                   /* true, if this executable is bound */
-static char *to_bind = NULL;    /* name bound program to be written */
 FILE *bound_program = NULL; /* points to embedded yabasic program (if any) */
 char *string;               /* for trash-strings */
 char *estring;              /* for error-strings */
@@ -202,7 +200,7 @@ int main(int argc, char **argv) {
   library_path[0] = '\0';
   library_default[0] = '\0';
 #ifdef UNIX
-  strcpy(library_default, LIBRARY_PATH);
+  strcpy(library_default, rk_default_library_path());
   lpath_def_from = 'b';
 #else
   fromlibpath = TRUE;
@@ -1128,7 +1126,7 @@ static void initialize(void)
   if (s->pointer) {
     my_free(s->pointer);
   }
-  s->pointer = my_strdup(rk_yab_os_name());
+  s->pointer = my_strdup((char *)rk_yab_os_name());
 
   /* set default-scales for grafics */
   fontheight = 10;

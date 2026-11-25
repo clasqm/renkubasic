@@ -1890,10 +1890,10 @@ static char *peek2(char *dest, struct command *curr) /* peek into internals */
   } else if (!strcmp(dest, "version")) {
     return my_strdup(PACKAGE_VERSION);
   } else if (!strcmp(dest, "os")) {
-    return my_strdup(rk_os_name());
+    return my_strdup((char *)rk_os_name());
   } else if (!strcmp(dest, "yabos")) {
     /* The spelling yab 1.8.3 programs compare against. */
-    return my_strdup(rk_yab_os_name());
+    return my_strdup((char *)rk_yab_os_name());
   } else if (!strcmp(dest, "renkuversion")) {
     return my_strdup(RENKU_VERSION);
   } else if (!strcmp(dest, "font")) {

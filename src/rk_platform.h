@@ -41,4 +41,12 @@ const char *rk_default_library_path(void);
    pretending to draw. */
 int rk_graphics_available(void);
 
+/* File descriptor that becomes readable when the graphic window has input
+   waiting, or -1 when this build has no window backend (or the backend has no
+   descriptor). io.c passes it to select() for inkey$. */
+int rk_window_fd(void);
+
+/* 1 when the window has a key waiting, 0 otherwise. */
+int rk_window_pending(void);
+
 #endif /* RK_PLATFORM_H */
