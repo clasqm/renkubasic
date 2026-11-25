@@ -1,0 +1,96 @@
+// RenkuBASIC CLI test: switch / case / default
+// Derived from: yabasic 2.92.1 tests/switch.yab and the switch chapter of
+//               the yabasic 2.92.1 manual.
+
+import harness
+
+sub describe$(n)
+  local r$
+  switch n
+    case 1
+      r$ = "one"
+      break
+    case 2
+    case 3
+      r$ = "two or three"
+      break
+    default
+      r$ = "other"
+      break
+  end switch
+  return r$
+end sub
+
+assert_str$(describe$(1), "one", "case 1")
+assert_str$(describe$(2), "two or three", "case 2 falls through to case 3")
+assert_str$(describe$(3), "two or three", "case 3")
+assert_str$(describe$(9), "other", "default")
+
+// String switch.
+sub colour$(c$)
+  local r$
+  switch c$
+    case "red"
+      r$ = "warm"
+      break
+    case "blue"
+      r$ = "cold"
+      break
+    default
+      r$ = "unknown"
+      break
+  end switch
+  return r$
+end sub
+
+assert_str$(colour$("red"), "warm", "string case 1")
+assert_str$(colour$("blue"), "cold", "string case 2")
+assert_str$(colour$("green"), "unknown", "string default")
+
+// Without break, execution continues into the next case.
+x = 0
+switch 1
+  case 1
+    x = x + 1
+  case 2
+    x = x + 10
+  case 3
+    x = x + 100
+end switch
+assert_eq(x, 111, "cases fall through without break")
+
+// Nested switch.
+x = 0
+switch 2
+  case 1
+    x = 1
+  case 2
+    switch 3
+      case 3
+        x = 33
+        break
+      default
+        x = 30
+        break
+    end switch
+    break
+  default
+    x = 99
+end switch
+assert_eq(x, 33, "nested switch")
+
+// switch inside a loop, with goto out of the switch.
+n = 0
+for i = 1 to 5
+  switch i
+    case 3
+      goto after_switch
+    default
+      n = n + 1
+  end switch
+next i
+label after_switch
+assert_eq(n, 2, "switch with goto leaves the loop")
+
+print "c022 done"
+exit 0

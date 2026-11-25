@@ -1,0 +1,34 @@
+// RenkuBASIC CLI test: yab compatibility peeks
+//
+// yab 1.8.3 (Examples/Version.yab and AllInOne.yab) uses peeks that yabasic
+// 2.92.1 does not have. RenkuBASIC must provide them.
+//
+// @requires: renkubasic
+
+import harness
+
+// yab programs print the working directory.
+assert_true(len(peek$("directory")) > 0, "peek$('directory')")
+
+// yab reports the interpreter version through peek$("version"); the language
+// level is unchanged, so yab's own version check keeps working.
+assert_true(len(peek$("version")) > 0, "peek$('version')")
+
+// yab extension: number of open windows (0 with no GUI started).
+assert_eq(peek("numwindows"), 0, "no windows open at startup")
+
+// yab extension: scrollbar width used by AllInOne.yab to lay out a view.
+assert_true(peek("scrollbarwidth") >= 0, "scrollbarwidth")
+
+// yab file helpers are present as functions (they only fail on a missing file,
+// so probe a file this test creates itself).
+f$ = "rk-yab-peeks.txt"
+open f$ for writing as #1
+print #1 "0123456789"
+close #1
+
+assert_eq(bfilesize(f$), 11, "bfilesize of a file with ten bytes and a newline")
+assert_true(bfiledirexists("."), "bfiledirexists for the current directory")
+
+print "c083 done"
+exit 0

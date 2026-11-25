@@ -1,0 +1,21 @@
+// RenkuBASIC CLI test: program name and arguments
+// Derived from: yabasic 2.92.1 tests/interpreter_and_program.yab
+
+import harness
+
+// Without extra arguments on the command line.
+assert_eq(peek("argument"), 0, "no arguments")
+assert_eq(peek("arguments"), 0, "arguments is a synonym")
+
+assert_str$(peek$("program_name"), "c074-arguments.yab", "program_name")
+assert_true(glob(peek$("program_file_name"), "*c074-arguments.yab"), "program_file_name")
+assert_true(len(peek$("interpreter_path")) > 0, "interpreter_path is not empty")
+
+// Looking at the interpreter path twice must give the same answer.
+p$ = peek$("interpreter_path")
+assert_str$(peek$("interpreter_path"), p$, "interpreter_path is stable")
+
+// peek$("directory") is a yab extension and is tested in c083-yab-peeks.yab.
+
+print "c074 done"
+exit 0

@@ -1,0 +1,56 @@
+// RenkuBASIC manual test: the five alert types
+// Derived from: yab 1.8.3 Examples/ButtonWorld.yab and subsubmenu.yab.
+//
+// Run with:  tests/run-tests.sh --suite manual --filter m0100
+//
+// A human must click the buttons and confirm:
+//   * each alert appears with the right icon (empty, info, idea, warning, stop)
+//   * the alert text is readable and not clipped
+//   * "Quit" closes the window and the program ends with status 0
+//
+// This test is interactive and is therefore not part of "suite all".
+
+// @requires: gui
+// @timeout: 300
+
+window open 200, 200 to 420, 380, "rk_alert_win", "RenkuBASIC alerts"
+layout "left, top", "rk_alert_win"
+
+button 10, 10 to 180, 34, "rk_alert_none", "Empty alert", "rk_alert_win"
+button 10, 45 to 180, 69, "rk_alert_info", "Info alert", "rk_alert_win"
+button 10, 80 to 180, 104, "rk_alert_idea", "Idea alert", "rk_alert_win"
+button 10, 115 to 180, 139, "rk_alert_warning", "Warning alert", "rk_alert_win"
+button 10, 150 to 180, 174, "rk_alert_stop", "Stop alert", "rk_alert_win"
+button 10, 185 to 180, 209, "rk_alert_quit", "Quit", "rk_alert_win"
+
+alert "Click each button once, then Quit.", "Ok", "idea"
+
+running = true
+while running
+  msg$ = message$
+  switch msg$
+    case "rk_alert_none|"
+      alert "This is an empty alert.", "Ok", "none"
+      break
+    case "rk_alert_info|"
+      alert "This is an info alert.", "Ok", "info"
+      break
+    case "rk_alert_idea|"
+      alert "This is an idea alert.", "Ok", "idea"
+      break
+    case "rk_alert_warning|"
+      alert "This is a warning alert.", "Ok", "warning"
+      break
+    case "rk_alert_stop|"
+      alert "This is a stop alert.", "Ok", "stop"
+      break
+    case "rk_alert_quit|"
+    case "rk_alert_win:_QuitRequested|"
+      running = false
+      break
+  end switch
+  sleep 0.02
+wend
+
+window close "rk_alert_win"
+exit 0

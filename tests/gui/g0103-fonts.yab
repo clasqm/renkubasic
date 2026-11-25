@@ -1,0 +1,54 @@
+// RenkuBASIC GUI test: TrueType/OpenType fonts in the graphic window
+//
+// This is a RenkuBASIC requirement: yabasic 2.92.1 assumed bitmap fonts, which
+// Haiku does not have. The graphic window must render fonts through the Haiku
+// font manager and the font size must actually change the text metrics.
+//
+// @requires: gui
+// @timeout: 30
+
+import harness
+
+window open 100, 100 to 560, 400, "rk_font_win", "RenkuBASIC fonts"
+view 0, 0 to 460, 300, "rk_font_view", "rk_font_win"
+draw set "bgcolor", 255, 255, 255, "rk_font_view"
+draw set "highcolor", 0, 0, 0, "rk_font_view"
+
+sample$ = "Wyfg 0123"
+
+draw set "DejaVu Sans, Roman, 12", "rk_font_view"
+draw text 10, 40, sample$, "rk_font_view"
+draw flush "rk_font_view"
+sleep 0.1
+small = draw get "text-width", sample$, "rk_font_view"
+smallh = draw get "max-text-height", "rk_font_view"
+
+draw set "DejaVu Sans, Bold, 32", "rk_font_view"
+draw text 10, 140, sample$, "rk_font_view"
+draw flush "rk_font_view"
+sleep 0.1
+big = draw get "text-width", sample$, "rk_font_view"
+bigh = draw get "max-text-height", "rk_font_view"
+
+assert_true(small > 0, "12 point text has a width")
+assert_true(big > small, "32 point text is wider than 12 point text")
+assert_true(bigh > smallh, "32 point text is taller than 12 point text")
+
+// A sans and a serif family must both be usable.
+draw set "DejaVu Serif, Roman, 18", "rk_font_view"
+draw text 10, 220, "serif fallback", "rk_font_view"
+draw flush "rk_font_view"
+serifw = draw get "text-width", "serif fallback", "rk_font_view"
+assert_true(serifw > 0, "serif family")
+
+// The font peek reports what was selected.
+assert_true(len(peek$("font")) > 0, "peek$('font') reports the font")
+
+// Render everything once and take a screenshot so the manual run has an artefact.
+draw flush "rk_font_view"
+screenshot 0, 0 to 459, 299, "rk-fonts.png"
+assert_true(bfilesize("rk-fonts.png") > 100, "font screenshot has content")
+
+window close "rk_font_win"
+print "g0103 done"
+exit 0

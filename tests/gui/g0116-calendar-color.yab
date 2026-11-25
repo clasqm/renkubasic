@@ -1,0 +1,38 @@
+// RenkuBASIC GUI test: calendar and colour control
+// Derived from: yab 1.8.3 Examples/AllInOne.yab, ColorDemo.yab and
+//               EvenMoreControls.yab.
+
+// @requires: gui
+// @timeout: 20
+
+import harness
+
+window open 100, 100 to 480, 340, "rk_cal_win", "RenkuBASIC calendar and colour"
+layout "left, top", "rk_cal_win"
+
+// Calendar control with a German style date format.
+calendar 10, 10, "rk_cal", "DDMMYYYY.", "01.01.1970", "rk_cal_win"
+calendar set "rk_cal", "24.12.2026"
+got$ = calendar get "rk_cal"
+assert_str$(got$, "24.12.2026", "calendar get returns what was set")
+
+// Colour control: set a colour and read the three components back.
+colorcontrol 10, 160, "rk_colour", "rk_cal_win"
+colorcontrol set "rk_colour", 140, 140, 240
+r = colorcontrol get "rk_colour", "red"
+g = colorcontrol get "rk_colour", "green"
+b = colorcontrol get "rk_colour", "blue"
+assert_eq(r, 140, "colour red")
+assert_eq(g, 140, "colour green")
+assert_eq(b, 240, "colour blue")
+
+// A view showing the selected colour, as ColorDemo.yab does.
+view 250, 10 to 370, 180, "rk_colour_view", "rk_cal_win"
+draw set "bgcolor", r, g, b, "rk_colour_view"
+draw text 10, 20, "selected", "rk_colour_view"
+draw flush "rk_colour_view"
+
+sleep 0.1
+window close "rk_cal_win"
+print "g0116 done"
+exit 0

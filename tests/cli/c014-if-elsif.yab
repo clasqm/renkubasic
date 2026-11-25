@@ -1,0 +1,69 @@
+// RenkuBASIC CLI test: if / elsif / else / endif
+// Derived from: yabasic 2.92.1 tests/grammar.yab, tests/bugs.yab and the
+//               conditions chapter of the yabasic 2.92.1 manual.
+
+import harness
+
+sub classify$(n)
+  local r$
+  if n < 0 then
+    r$ = "negative"
+  elsif n = 0 then
+    r$ = "zero"
+  elsif n < 10 then
+    r$ = "small"
+  else
+    r$ = "large"
+  endif
+  return r$
+end sub
+
+assert_str$(classify$(-5), "negative", "if branch")
+assert_str$(classify$(0), "zero", "elsif branch 1")
+assert_str$(classify$(7), "small", "elsif branch 2")
+assert_str$(classify$(70), "large", "else branch")
+
+// fi is a synonym for endif.
+x = 0
+if (1 = 2) then
+  x = 1
+fi
+assert_eq(x, 0, "fi closes an if")
+
+// Nested ifs.
+a = 1 : b = 2
+if a = 1 then
+  if b = 2 then
+    x = 10
+  else
+    x = 20
+  endif
+else
+  x = 30
+endif
+assert_eq(x, 10, "nested if")
+
+// Logical operators in conditions.
+assert_true(1 < 2 and 2 < 3, "logical and")
+assert_false(1 < 2 and 2 > 3, "logical and is not or")
+assert_true(1 > 2 or 2 < 3, "logical or")
+assert_false(not (1 < 2), "logical not")
+assert_true(not (1 > 2), "logical not of false")
+
+// Short-circuit evaluation: the right side must not be evaluated when the
+// left side already decides the result (this used to be a bug).
+x = 0
+if (0 and (x = 1)) then
+  x = 99
+endif
+assert_eq(x, 0, "and short circuit")
+if (1 or (x = 1)) then
+  x = 5
+endif
+assert_eq(x, 5, "or short circuit")
+
+// Comparison between a number and an expression with lower precedence.
+assert_true(2 < 0 + 3, "operator precedence in conditions")
+
+print "c014 done"
+exit 0

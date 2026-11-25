@@ -1,0 +1,49 @@
+// RenkuBASIC GUI test: sliders, scrollbars, status bars, spin controls
+// Derived from: yab 1.8.3 Examples/SliderWorld.yab, AllInOne.yab and
+//               EvenMoreControls.yab.
+
+// @requires: gui
+// @timeout: 20
+
+import harness
+
+window open 100, 100 to 560, 400, "rk_slider_win", "RenkuBASIC sliders"
+
+slider 20, 20 to 350, 50, "rk_slider1", "a slider", 1, 10, "rk_slider_win"
+slider set "rk_slider1", 5
+slider label "rk_slider1", "low", "high"
+slider colour "rk_slider1", "barcolor", 240, 140, 140
+slider colour "rk_slider1", "fillcolor", 140, 140, 240
+
+slider 20, 60 to 350, 90, "rk_slider2", "triangle thumb", 1, 100, "triangle", "rk_slider_win"
+slider set "rk_slider2", 20
+
+slider 20, 100 to 350, 130, "rk_slider3", "vertical", 1, 100, "vertical", "rk_slider_win"
+slider set "rk_slider3", "left", 15
+
+// Scrollbar attached to a view, as in AllInOne.yab.
+view 20, 150 to 340, 260, "rk_scroll_view", "rk_slider_win"
+scrollbar "rk_scroll", 3, "rk_scroll_view"
+scrollbar set "rk_scroll", "horizontal-range", 0, 100
+scrollbar set "rk_scroll", "vertical-range", 0, 50
+scrollbar set "rk_scroll", "proportion", 0.5
+draw set "bgcolor", 230, 230, 250, "rk_scroll_view"
+draw text 10, 30, "scrollable view", "rk_scroll_view"
+draw flush "rk_scroll_view"
+
+// Status bar: set the percentage.
+statusbar 20, 270 to 340, 294, "rk_status", "start", "finished", "rk_slider_win"
+statusbar set "rk_status", "start", "finished", 66
+
+// Spin control: set a value inside its range.
+spincontrol 360, 20, "rk_spin", "spin", 0, 100, 1, "rk_slider_win"
+spincontrol set "rk_spin", 42
+
+// Stack view: two panels, switch between them.
+stackview 360, 60 to 440, 160, "rk_stack", 2, "rk_slider_win"
+stackview set "rk_stack", 2
+
+sleep 0.1
+window close "rk_slider_win"
+print "g0114 done"
+exit 0

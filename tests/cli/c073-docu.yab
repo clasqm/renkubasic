@@ -1,0 +1,22 @@
+// RenkuBASIC CLI test: embedded documentation (doc / docu$)
+// Derived from: yabasic 2.92.1 tests/resources/docu.yab and the docu chapter
+//               of the manual. The --docu command line option is tested by
+//               tests/cli/c099-docu-option.sh.
+
+import harness
+
+doc first documentation line
+doc second documentation line
+
+// docu$ is collected before the program runs, so all three doc statements are
+// already there, including the one after the assignment below.
+assert_eq(arraysize(docu$(), 1), 3, "docu$ has three lines")
+assert_str$(docu$(1), "first documentation line", "docu$ line 1")
+assert_str$(docu$(2), "second documentation line", "docu$ line 2")
+assert_str$(docu$(3), "third line", "docu$ line 3")
+
+x = 1
+doc third line
+
+print "c073 done"
+exit 0

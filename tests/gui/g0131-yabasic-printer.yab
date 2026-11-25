@@ -1,0 +1,35 @@
+// RenkuBASIC GUI test: printing graphics to a file
+//
+// yabasic's `open printer` writes PostScript. On Haiku the delivery mechanism
+// changes (a file handed to the print server, never /usr/bin/lpr), but writing
+// to an explicit filename stays the same and can be checked automatically.
+//
+// @requires: gui
+// @timeout: 30
+
+import harness
+
+open window 200, 150
+backcolor 255, 255, 255
+color 0, 0, 0
+clear window
+
+open printer "rk-print.ps"
+line 10, 10 to 190, 140
+rectangle 20, 20 to 100, 80
+text 30, 100, "RenkuBASIC print test"
+clear window          // starts a second page
+circle 100, 75, 40
+close printer
+
+assert_true(bfilesize("rk-print.ps") > 100, "PostScript file written")
+
+// A print file must look like PostScript, not like an empty file.
+open "rk-print.ps" for reading as #1
+line input #1 header$
+close #1
+assert_true(glob(header$, "%!PS*"), "print file starts with the PostScript header")
+
+close window
+print "g0131 done"
+exit 0

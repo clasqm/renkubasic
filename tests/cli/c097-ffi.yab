@@ -1,0 +1,37 @@
+// RenkuBASIC CLI test: the foreign function interface
+// Derived from: yabasic 2.92.1 tests/foreign.yab, tests/foreign3.yab and the
+//               FFI chapter of the manual.
+//
+// The library holding the C maths functions differs per platform:
+//   Haiku/RenkuOS : libroot.so
+//   other Unixes  : libm.so.6
+//
+// @requires: ffi
+
+import harness
+
+os$ = peek$("os")
+if os$ = "haiku" or os$ = "renkuos" then
+  lib$ = "libroot.so"
+else
+  lib$ = "libm.so.6"
+endif
+
+// Sizes of the FFI types are stable and independent of the platform library.
+assert_true(foreign_function_size("int") > 0, "size of int")
+assert_true(foreign_function_size("double") > 0, "size of double")
+assert_true(foreign_function_size("long") > 0, "size of long")
+
+// cos(0) == 1 through the external library.
+assert_near(foreign_function_call(lib$, "double", "cos", "double", 0), 1, 1e-12, "foreign cos")
+assert_near(foreign_function_call(lib$, "double", "sqrt", "double", 9), 3, 1e-12, "foreign sqrt")
+
+// A buffer can be allocated, written, read back and freed.
+b$ = foreign_buffer_alloc$(16)
+foreign_buffer_set b$, 0, "int", 1234
+assert_eq(foreign_buffer_get(b$, 0, "int"), 1234, "buffer round trip")
+assert_eq(foreign_buffer_size(b$), 16, "buffer size")
+foreign_buffer_free b$
+
+print "c097 done"
+exit 0

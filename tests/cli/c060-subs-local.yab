@@ -1,0 +1,62 @@
+// RenkuBASIC CLI test: subroutines, recursion, local variables
+// Derived from: yabasic 2.92.1 tests/local.yab and the subroutine chapter of
+//               the yabasic 2.92.1 manual.
+
+import harness
+
+// Recursion: `local i` must be a fresh variable in every invocation.
+recurse(1)
+assert_eq(deepest, 5, "recursion reached depth 5")
+
+sub recurse(x)
+  local i
+
+  if x > deepest deepest = x
+  if x > 4 return
+
+  for i = 1 to 2
+    recurse(x + 1)
+    if i > 2 error "improper handling of local variable"
+  next i
+  return
+end sub
+
+// A subroutine without local sees (and can change) globals.
+g = 1
+bump()
+assert_eq(g, 2, "subroutine modifies a global")
+
+sub bump()
+  g = g + 1
+end sub
+
+// Arguments are passed by value, results come back through the return value.
+x = 5
+y = double_it(x)
+assert_eq(y, 10, "return value")
+assert_eq(x, 5, "argument is passed by value")
+
+sub double_it(n)
+  return n * 2
+end sub
+
+// A subroutine may return from several places.
+assert_str$(grade$(95), "A", "return from the first branch")
+assert_str$(grade$(75), "B", "return from the second branch")
+assert_str$(grade$(10), "F", "return from the end")
+
+sub grade$(n)
+  if n >= 90 return "A"
+  if n >= 70 return "B"
+  return "F"
+end sub
+
+// Subs may be called before their definition appears in the file.
+assert_eq(early(3), 9, "call before definition")
+
+sub early(n)
+  return n * n
+end sub
+
+print "c060 done"
+exit 0

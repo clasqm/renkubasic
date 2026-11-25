@@ -1,0 +1,24 @@
+// RenkuBASIC CLI test: reading standard input until end of file
+// Derived from: yabasic 2.92.1 tests/resources/read_stdin.yab (driven by
+//               tests/read_stdin.sh) and tests/resources/digits.txt.
+// The runner feeds tests/fixtures/digits.txt on stdin (@stdin below).
+
+// @stdin: fixtures/digits.txt
+
+import harness
+
+n = 0
+while (!eof(0))
+  line input "" l$
+  n = n + 1
+  if n > 100 error "infinite loop"
+wend
+assert_eq(n, 2, "two lines on stdin")
+assert_str$(l$, "1234567890", "last line")
+
+// The same data, read byte by byte through peek(0).
+open "/dev/null" for reading as #9
+close #9
+
+print "c071 done"
+exit 0

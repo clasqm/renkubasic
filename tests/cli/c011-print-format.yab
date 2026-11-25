@@ -1,0 +1,38 @@
+// RenkuBASIC CLI test: number formatting
+// Derived from: yabasic 2.92.1 tests/strdollar.yab and the `using` chapter of
+// the yabasic 2.92.1 manual.
+
+import harness
+
+// C-style formats through str$().
+assert_str$(str$(1000 * pi, "%g"), "3141.59", "%g")
+assert_str$(str$(1000 * pi, "%2.5f"), "3141.59265", "%2.5f")
+assert_str$(str$(1000 * pi, "%12.5f"), "  3141.59265", "%12.5f width")
+assert_str$(str$(1000 * pi, "%012.5g"), "0000003141.6", "%012.5g zero padding")
+assert_str$(str$(1000 * pi, "%-12.5f"), "3141.59265  ", "%-12.5f left align")
+
+// Basic-style picture formats.
+assert_str$(str$(1000 * pi, "#####.##"), " 3141.59", "#####.##")
+assert_str$(str$(1000 * pi, "##,###.##"), " 3,141.59", "##,###.##")
+assert_str$(str$(1000 * pi, "#####"), " 3142", "##### rounds")
+assert_str$(str$(1000 * pi, "##.###"), "##.###", "picture too small")
+
+// Third argument: digit group and decimal separators.
+assert_str$(str$(1000 * pi, "##,###.##", ".,"), " 3.141,59", "swapped separators")
+assert_str$(str$(1000 * pi, "##,###.##", "_,"), " 3_141,59", "underscore separator")
+
+// Large and negative values.
+assert_str$(str$(4294967295, "##########"), "4294967295", "32 bit value")
+assert_str$(str$(123123123123123, "#################"), "  123123123123123", "large value")
+assert_str$(str$(-123123123123123, "###########"), "###########", "picture too small")
+
+// Rounding towards zero for small fractions in a #### picture.
+assert_str$(str$(0.1, "####"), "   0", "0.1 in ####")
+assert_str$(str$(-0.1, "####.#"), "  -0.1", "-0.1 in ####.#")
+
+// The using-clause of print uses the same machinery.
+print 3.14159 using "##.##"
+print 3.14159 using ("##,###.##", ".,")
+
+print "c011 done"
+exit 0

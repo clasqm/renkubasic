@@ -1,0 +1,42 @@
+// RenkuBASIC GUI test: screenshots, bitmaps and draw bitmap
+// Derived from: yab 1.8.3 Examples/IconWorld.yab, FakeTransparency.yab and
+//               3D-Curve.yab (double buffering through draw bitmap).
+
+// @requires: gui
+// @timeout: 30
+
+import harness
+
+window open 100, 100 to 460, 360, "rk_bmp_win", "RenkuBASIC bitmaps"
+view 0, 0 to 360, 260, "rk_bmp_view", "rk_bmp_win"
+
+// Draw something recognisable.
+draw set "bgcolor", 255, 255, 255, "rk_bmp_view"
+draw set "highcolor", 0, 0, 0, "rk_bmp_view"
+draw circle 180, 130, 80, "rk_bmp_view"
+draw line 100, 50 to 260, 210, "rk_bmp_view"
+draw text 10, 20, "screenshot source", "rk_bmp_view"
+draw flush "rk_bmp_view"
+
+// Capture the view to a PNG file.
+screenshot 0, 0 to 359, 259, "rk-shot.png"
+assert_true(bfilesize("rk-shot.png") > 100, "screenshot written")
+
+// Load it back as a bitmap and draw that bitmap (the double-buffer pattern
+// from 3D-Curve.yab).
+bitmap get "rk_bmp", "path", "rk-shot.png"
+draw bitmap 0, 0, "rk_bmp", "copy", "rk_bmp_view"
+draw bitmap 0, 0, "rk_bmp", "alpha", "rk_bmp_view"
+draw flush "rk_bmp_view"
+
+// A second capture must work after drawing the bitmap.
+screenshot 0, 0 to 359, 259, "rk-shot2.png"
+assert_true(bfilesize("rk-shot2.png") > 100, "second screenshot written")
+
+// Bitmaps can be removed again.
+bitmap remove "rk_bmp"
+
+sleep 0.1
+window close "rk_bmp_win"
+print "g0120 done"
+exit 0

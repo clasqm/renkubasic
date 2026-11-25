@@ -1,0 +1,25 @@
+// RenkuBASIC CLI test: libraries, namespaces and export
+// Derived from: yabasic 2.92.1 tests/import.yab, tests/nested_import.yab and
+//               the "Libraries" chapter of the manual.
+// The libraries live in tests/lib, which the runner puts on --librarypath.
+
+import harness
+import mathx
+
+// Exported subs are callable without a prefix.
+assert_eq(square(4), 16, "exported sub, unprefixed call")
+
+// Non-exported subs are reachable through the library namespace.
+assert_eq(mathx.hidden(1), 2, "non-exported sub, namespaced call")
+
+// A library that imports another library keeps working (nested import).
+assert_eq(helper.triple(3), 9, "nested library, namespaced call")
+assert_eq(mathx.triple_via_helper(2), 6, "library uses its own import")
+
+// The imported library and the main program do not share variables.
+counter = 100
+assert_eq(mathx.own_counter(), 1, "library has its own variables")
+assert_eq(counter, 100, "main program variables are unaffected")
+
+print "c063 done"
+exit 0

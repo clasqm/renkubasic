@@ -1,0 +1,37 @@
+// RenkuBASIC GUI test: opening and closing windows repeatedly
+// Derived from: yab 1.8.3 Examples/WindowWorld.yab (new window button) and
+//               ButtonWorld.yab (quit path).
+
+// @requires: gui
+// @timeout: 30
+
+import harness
+
+// Open and close a window several times; neither the window count nor the
+// program state may leak.
+for i = 1 to 3
+  window open 100 + i * 20, 100 + i * 20 to 300 + i * 20, 260 + i * 20, "rk_loop_win", "loop window " + str$(i)
+  assert_eq(window count, 1, "one window in the loop")
+  view 0, 0 to 150, 100, "rk_loop_view", "rk_loop_win"
+  draw set "bgcolor", 220, 220, 220, "rk_loop_view"
+  draw text 10, 20, "round " + str$(i), "rk_loop_view"
+  draw flush "rk_loop_view"
+  sleep 0.05
+  window close "rk_loop_win"
+  assert_eq(window count, 0, "window closed in the loop")
+next i
+
+// Two windows at once, closed in the reverse order.
+window open 100, 100 to 300, 260, "rk_a", "A"
+window open 320, 100 to 520, 260, "rk_b", "B"
+assert_eq(window count, 2, "two windows")
+window close "rk_b"
+window close "rk_a"
+assert_eq(window count, 0, "all closed")
+
+// Messages must be readable (empty is fine) without blocking the program.
+m$ = message$
+assert_true(len(m$) >= 0, "message$ returns a string")
+
+print "g0119 done"
+exit 0

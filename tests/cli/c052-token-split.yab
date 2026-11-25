@@ -1,0 +1,50 @@
+// RenkuBASIC CLI test: token and split
+// Derived from: the token/split chapters of the yabasic 2.92.1 manual and the
+//               use of split() in yab 1.8.3 Examples/Checkbox.yab.
+//
+// Note: the grammar of yabasic 2.92.1 still contains rules for tokenalt(),
+// splitalt() and arrayerase(), but no keyword reaches them; they are dead
+// syntax and are therefore not tested (see docs/platform-inventory.md).
+
+import harness
+
+// split() keeps empty fields and returns the number of fields.
+dim f$(8)
+s$ = "a:b::c:"
+n = split(s$, f$(), ":")
+assert_eq(n, 5, "split count with trailing delimiter")
+assert_str$(f$(1), "a", "split field 1")
+assert_str$(f$(2), "b", "split field 2")
+assert_str$(f$(3), "", "split keeps the empty field")
+assert_str$(f$(4), "c", "split field 4")
+assert_str$(f$(5), "", "split trailing empty field")
+
+// split() with the default separator splits on whitespace.
+dim w$(8)
+n = split("one two three", w$())
+assert_eq(n, 3, "split on whitespace")
+assert_str$(w$(2), "two", "split second word")
+
+// split() resizes the array it is given.
+dim small$(2)
+n = split("1 2 3 4 5", small$())
+assert_eq(n, 5, "split count")
+assert_eq(arraysize(small$(), 1), 5, "split resized the array")
+assert_str$(small$(5), "5", "split last element")
+
+// token() skips empty fields.
+dim t$(8)
+n = token("a::b:", t$(), ":")
+assert_eq(n, 2, "token skips empty fields")
+assert_str$(t$(1), "a", "token field 1")
+assert_str$(t$(2), "b", "token field 2")
+assert_eq(arraysize(t$(), 1), 2, "token shrinks the array")
+
+// token() with the default separators.
+dim u$(8)
+n = token("alpha beta  gamma", u$())
+assert_eq(n, 3, "token on whitespace")
+assert_str$(u$(3), "gamma", "token third word")
+
+print "c052 done"
+exit 0

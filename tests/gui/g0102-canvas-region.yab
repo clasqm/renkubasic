@@ -1,0 +1,33 @@
+// RenkuBASIC GUI test: canvas and region
+// Derived from: yab 1.8.3 Examples/GUI-World.yab (canvas use) and the
+//               view/region commands of the yab grammar.
+
+// @requires: gui
+// @timeout: 20
+
+import harness
+
+window open 100, 100 to 460, 360, "rk_canvas_win", "RenkuBASIC canvas"
+
+// A canvas is a view that is meant to be drawn on.
+canvas 10, 10 to 200, 200, "rk_canvas", "rk_canvas_win"
+draw set "bgcolor", 240, 240, 210, "rk_canvas"
+draw set "highcolor", 0, 90, 0, "rk_canvas"
+draw set "DejaVu Sans, Roman, 14", "rk_canvas"
+draw text 10, 30, "canvas text", "rk_canvas"
+draw line 0, 0 to 190, 190, "rk_canvas"
+draw flush "rk_canvas"
+
+// A region clips drawing to a rectangle inside its parent view.
+region 220, 10 to 340, 150, "rk_region", "rk_canvas_win"
+draw set "bgcolor", 210, 220, 240, "rk_region"
+draw text 5, 20, "region", "rk_region"
+draw flush "rk_region"
+
+sleep 0.1
+tw = draw get "text-width", "region", "rk_region"
+assert_true(tw > 0, "region is drawable")
+
+window close "rk_canvas_win"
+print "g0102 done"
+exit 0

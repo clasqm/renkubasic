@@ -1,0 +1,33 @@
+// RenkuBASIC CLI test: assigning to left$, right$ and mid$
+// Derived from: yabasic 2.92.1 tests/string.yab
+
+import harness
+
+a$ = "foo"
+left$(a$, 1) = "z"
+assert_str$(a$, "zoo", "assign to left$")
+
+a$ = "foo"
+left$(a$, 1) = "bar"
+assert_str$(a$, "boo", "assign a longer string to left$ truncates")
+
+a$ = "bar"
+right$(a$, 3) = "foo"
+assert_str$(a$, "foo", "assign to right$")
+
+// Assigning a shorter string overwrites only that many characters; the rest of
+// the designated field stays (reference behaviour of 2.92.1).
+a$ = "foobar"
+right$(a$, 3) = "xy"
+assert_str$(a$, "fooxyr", "assign a shorter string to right$")
+
+a$ = "foobarbaz"
+mid$(a$, 4, 3) = "qux"
+assert_str$(a$, "fooquxbaz", "assign to mid$ with length")
+
+a$ = "foobar"
+mid$(a$, 4) = "XYZ"
+assert_str$(a$, "fooXYZ", "assign to mid$ to the end")
+
+print "c051 done"
+exit 0

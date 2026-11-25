@@ -1,0 +1,31 @@
+// RenkuBASIC CLI test: bit operations
+// Derived from: yabasic 2.92.1 tests/bitops.yab
+
+import harness
+
+assert_eq(or(0b10, 0b01), 0b11, "or")
+assert_eq(or(0b110, 0b101), 0b111, "or overlapping")
+assert_eq(and(0b10, 0b01), 0b00, "and without overlap")
+assert_eq(and(0b110, 0b101), 0b100, "and overlapping")
+assert_eq(eor(0b110, 0b101), 0b11, "eor")
+assert_eq(eor(0b10, 0b101), 0b111, "eor disjoint")
+// not() is the logical negation (returns 0 or 1); bitnot() is the bitwise one.
+assert_eq(not(0b11), 0, "not is logical")
+assert_eq(not(0), 1, "not(0) is 1")
+assert_eq(shl(0b11, 2), 0b1100, "shl")
+assert_eq(shr(0b1100, 2), 0b11, "shr")
+assert_eq(bitnot(0b1001110), 0b11111111111111111111111110110001, "bitnot")
+assert_eq(bitnot(3), 4294967292, "bitnot is 32 bit wide")
+
+// Shifts by zero and large shifts.
+assert_eq(shl(1, 0), 1, "shl by zero")
+assert_eq(shr(8, 0), 8, "shr by zero")
+assert_eq(shl(1, 10), 1024, "shl by ten")
+
+// Bit operations combine with the decimal forms of the same numbers.
+assert_eq(and(255, 15), 15, "and decimal")
+assert_eq(or(240, 15), 255, "or decimal")
+assert_eq(eor(255, 255), 0, "eor identical")
+
+print "c042 done"
+exit 0

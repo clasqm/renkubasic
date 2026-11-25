@@ -1,0 +1,12 @@
+// RenkuBASIC CLI test: a syntax error is reported, not ignored
+// Derived from: yabasic 2.92.1 tests/error/error_string_not_terminated.yab
+//
+// Comparing a string with a number has no implicit conversion in yabasic, so
+// this program must be rejected at compile time.
+
+// @expect-exit: 1
+// @expect-stderr-contains: syntax error
+
+if "1" = 1 then
+  print "unreachable"
+endif

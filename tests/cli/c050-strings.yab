@@ -1,0 +1,64 @@
+// RenkuBASIC CLI test: string functions
+// Derived from: yabasic 2.92.1 tests/string.yab and the string chapters of the
+//               yabasic 2.92.1 manual.
+
+import harness
+
+// Substrings.
+assert_str$(left$("abc", 2), "ab", "left$")
+assert_str$(right$("abc", 2), "bc", "right$")
+assert_str$(mid$("abc", 2, 1), "b", "mid$ with length")
+assert_str$(mid$("abcdef", 3), "cdef", "mid$ without length")
+assert_str$(left$("abc", 0), "", "left$ of length zero")
+assert_str$(left$("abc", 10), "abc", "left$ beyond the end")
+
+// Length and case.
+assert_eq(len("foo"), 3, "len")
+assert_eq(len(""), 0, "len of empty string")
+assert_eq(len("a\"b"), 3, "len with an escaped quote")
+assert_str$(upper$("abc"), "ABC", "upper$")
+assert_str$(lower$("ABC"), "abc", "lower$")
+
+// Trimming.
+assert_str$(ltrim$("  x  "), "x  ", "ltrim$")
+assert_str$(rtrim$("  x  "), "  x", "rtrim$")
+assert_str$(trim$("  x  "), "x", "trim$")
+assert_str$(trim$("\t x \t"), "x", "trim$ removes tabs")
+
+// chomp$ removes exactly one trailing newline.
+assert_str$(chomp$("foo\n"), "foo", "chomp$ newline")
+assert_str$(chomp$("foo"), "foo", "chomp$ without newline")
+// 2.92.1 strips every trailing newline (the manual says one; the reference
+// implementation is what is pinned here).
+assert_str$(chomp$("foo\n\n"), "foo", "chomp$ removes trailing newlines")
+
+// Repeating and replacing.
+assert_str$(string$(4, "foo"), "foofoofoofoo", "string$ repeat")
+assert_str$(string$(0, "foo"), "", "string$ zero times")
+assert_str$(replace$("foo", "o", "uu"), "fuuuu", "replace$")
+assert_str$(replace$("fuuuu", "uu", "o"), "foo", "replace$ back")
+assert_str$(replace$("foo", "", "x"), "foo", "replace$ empty search")
+assert_str$(replace$("foo", "o", ""), "f", "replace$ delete")
+assert_str$(replace$("foo", "u", ""), "foo", "replace$ no match")
+
+// Pattern matching.
+assert_true(glob("foobar", "*bar"), "glob suffix")
+assert_true(glob("bar", "*bar"), "glob suffix short")
+assert_false(glob("foo", "*bar"), "glob no match")
+
+// Searching. Positions are 1 based; 0 means "not found".
+assert_eq(instr("foobar", "foo"), 1, "instr at the start")
+assert_eq(instr("foobar", "bar"), 4, "instr in the middle")
+assert_eq(instr("foobar", "zzz"), 0, "instr not found")
+assert_eq(instr("foobar", "o"), 2, "instr first occurrence")
+assert_eq(instr("foobar", "o", 3), 3, "instr with start position")
+assert_eq(rinstr("foobar", "o"), 3, "rinstr last occurrence")
+
+// Str$ / val$ round trips.
+assert_eq(val("42"), 42, "val integer")
+assert_near(val("3.5"), 3.5, 1e-12, "val fraction")
+assert_eq(val("  7"), 7, "val skips leading spaces")
+assert_str$(str$(42), "42", "str$ integer")
+
+print "c050 done"
+exit 0

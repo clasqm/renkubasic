@@ -1,0 +1,6 @@
+# local reference interpreter used while writing tests (not part of the project)
+.refbin/
+.probe/
+# test scratch output
+tests/.scratch/
+build/

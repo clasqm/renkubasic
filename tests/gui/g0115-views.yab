@@ -1,0 +1,41 @@
+// RenkuBASIC GUI test: tab, box, split and stack views
+// Derived from: yab 1.8.3 Examples/AllInOne.yab (tabs, splitview,
+//               stackview), Loop-World.yab and GUI-World.yab.
+
+// @requires: gui
+// @timeout: 20
+
+import harness
+
+window open 100, 100 to 560, 420, "rk_views_win", "RenkuBASIC views"
+layout "left, top", "rk_views_win"
+
+// Tab view with two pages.
+tabview 10, 10 to 260, 200, "rk_tabs", "top", "rk_views_win"
+tabview add "rk_tabs", "First"
+tabview add "rk_tabs", "Second"
+tabview set "rk_tabs", 2
+tabview set "rk_tabs", 1
+tabview remove "rk_tabs", 2
+tabview add "rk_tabs", "Third"
+
+// Box view with a title.
+boxview 280, 10 to 440, 120, "rk_box", "a box", 2, "rk_views_win"
+boxview set "rk_box", "still a box", "with a title"
+
+// Split view: horizontal, two panes.
+splitview 10, 220 to 260, 300, "rk_split", true, false, "rk_views_win"
+draw set "bgcolor", 220, 220, 240, "rk_split1"
+draw set "bgcolor", 240, 220, 220, "rk_split2"
+
+// Stack view.
+stackview 280, 140 to 440, 220, "rk_stack2", 2, "rk_views_win"
+stackview set "rk_stack2", 1
+draw set "bgcolor", 200, 230, 200, "rk_stack21"
+draw set "bgcolor", 230, 200, 230, "rk_stack22"
+stackview set "rk_stack2", 2
+
+sleep 0.1
+window close "rk_views_win"
+print "g0115 done"
+exit 0

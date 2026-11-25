@@ -1,0 +1,42 @@
+// RenkuBASIC CLI test: short (single line) if
+// Derived from: yabasic 2.92.1 tests/short_if.yab
+
+import harness
+
+if (1 < 2) print "short if with print"
+
+x = 0
+if (1 < 2) x = 1
+assert_eq(x, 1, "short if took the branch")
+
+x = 0
+if (1 = 2) x = 1 : x = 1 : x = 1
+assert_eq(x, 0, "short if did not take the branch")
+
+x = 0
+if (1 = 2) x = 1 : x = 1 : x = 1
+x = 2
+assert_eq(x, 2, "statements after a false short if still run")
+
+x = 0
+if (1 < 2) x = 1 : y = 1 : z = 1
+assert_eq(x, 1, "first statement of short if")
+assert_eq(y, 1, "second statement of short if")
+assert_eq(z, 1, "third statement of short if")
+
+x = 0
+if (1 = 1) x = 1 : x = 2 : x = 3
+assert_eq(x, 3, "all colon separated statements run")
+
+// A short if with an empty body is legal.
+if (1 < 2) :
+
+// Short if with a goto.
+x = 0
+if (1 < 2) goto shortif_target
+x = 99
+label shortif_target
+assert_eq(x, 0, "short if with goto")
+
+print "c013 done"
+exit 0

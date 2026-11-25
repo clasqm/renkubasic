@@ -1,0 +1,26 @@
+// RenkuBASIC CLI test: long variable names must not overflow anything
+// Derived from: yabasic 2.92.1 tests/long_variable_name.yab
+
+import harness
+
+a = bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+assert_eq(a, 0, "a very long name is zero")
+
+// Assigning through a very long name must not crash either. (yabasic limits
+// the length of identifiers, so the write and the read above are not the same
+// variable; the upstream test only checks that the assignment is harmless.)
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb = 5
+
+// Variable names are case sensitive in yabasic (and in yab); keywords are not.
+MiXeDcAsE = 3
+assert_eq(MiXeDcAsE, 3, "mixed case name reads back")
+assert_eq(mixedcase, 0, "a different case is a different variable")
+
+// Keyword case does not matter.
+IF 1 < 2 THEN
+  keyword_test = 1
+ENDIF
+assert_eq(keyword_test, 1, "keywords are case insensitive")
+
+print "c092 done"
+exit 0

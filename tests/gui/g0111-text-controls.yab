@@ -1,0 +1,49 @@
+// RenkuBASIC GUI test: text controls, text edits and labels
+// Derived from: yab 1.8.3 Examples/EvenMoreControls.yab, AllInOne.yab and
+//               Keyboard.yab.
+
+// @requires: gui
+// @timeout: 20
+
+import harness
+
+window open 100, 100 to 520, 380, "rk_text_win", "RenkuBASIC text controls"
+layout "left, top", "rk_text_win"
+
+text 10, 10, "rk_label", "a plain label", "rk_text_win"
+text set "rk_label", "align-center"
+
+texturl 10, 34, "rk_url", "RenkuOS", "https://wayofrenkuos.miraheze.org/", "rk_text_win"
+
+// A single line text control: set a value, read it back.
+textcontrol 10, 60 to 300, 84, "rk_tc", "Name:", "", "rk_text_win"
+textcontrol set "rk_tc", "RenkuBASIC"
+got$ = textcontrol get "rk_tc"
+assert_str$(got$, "RenkuBASIC", "textcontrol get returns what was set")
+
+// The second form of textcontrol set selects masked input.
+textcontrol 10, 94 to 300, 118, "rk_tc2", "Password:", "", "rk_text_win"
+textcontrol set "rk_tc2", 1
+
+// A multi line text edit: add, replace, read, clear.
+textedit 10, 130 to 300, 230, "rk_te", 4, "rk_text_win"
+textedit add "rk_te", "first line"
+textedit add "rk_te", "second line"
+textedit set "rk_te", "replaced text"
+got$ = textedit get "rk_te"
+assert_str$(got$, "replaced text", "textedit get after set")
+
+textedit clear "rk_te"
+textedit set "rk_te", "after clear"
+got$ = textedit get "rk_te"
+assert_str$(got$, "after clear", "textedit after clear")
+
+// Colours and label of a text control can be changed.
+textedit colour "rk_te", "highcolor", 0, 0, 0
+textedit colour "rk_te", "bgcolor", 250, 250, 230
+option set "rk_tc", "label", "Renamed:"
+
+sleep 0.1
+window close "rk_text_win"
+print "g0111 done"
+exit 0

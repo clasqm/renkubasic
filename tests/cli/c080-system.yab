@@ -1,0 +1,23 @@
+// RenkuBASIC CLI test: system() and system$()
+// Derived from: yabasic 2.92.1 tests/system.yab and the system chapter of the
+//               manual.
+
+import harness
+
+// Exit status: 0 for success, something else for failure.
+assert_eq(system("exit 0"), 0, "system with success")
+assert_ne(system("exit 3"), 0, "system with failure")
+
+// system$() collects the output of the command.
+out$ = chomp$(system$("echo hello"))
+assert_str$(out$, "hello", "system$ output")
+assert_str$(chomp$(system$("echo two words")), "two words", "system$ keeps spaces")
+
+// The output may be split into fields, as yab programs do.
+dim f$(8)
+n = split(chomp$(system$("echo one two three")), f$())
+assert_eq(n, 3, "split of system$ output")
+assert_str$(f$(1), "one", "first field of system$ output")
+
+print "c080 done"
+exit 0

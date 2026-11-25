@@ -1,0 +1,39 @@
+// RenkuBASIC GUI test: buttons, checkboxes, radio buttons
+// Derived from: yab 1.8.3 Examples/ButtonWorld.yab, Checkbox.yab and
+//               AllInOne.yab.
+
+// @requires: gui
+// @timeout: 20
+
+import harness
+
+window open 100, 100 to 420, 320, "rk_btn_win", "RenkuBASIC buttons"
+window set "rk_btn_win", "flags", "not-h-resizable, not-v-resizable"
+layout "left, top", "rk_btn_win"
+
+button 10, 10 to 120, 34, "rk_button", "Press me", "rk_btn_win"
+tooltip "rk_button", "a button"
+
+checkbox 10, 50, "rk_check", "A checkbox", true, "rk_btn_win"
+tooltip "rk_check", "a checkbox"
+
+radiobutton 10, 80, "rk_radio1", "Choice one", true, "rk_btn_win"
+radiobutton 10, 105, "rk_radio2", "Choice two", false, "rk_btn_win"
+
+// Labels and states can be changed from the program.
+option set "rk_button", "label", "Pressed already"
+option set "rk_check", "label", "changed"
+option set "rk_radio2", "enabled", false
+
+// Checkboxes and radio buttons can be set programmatically.
+checkbox set "rk_check", true
+checkbox set "rk_check", false
+radiobutton set "rk_radio1", false
+radiobutton set "rk_radio2", true
+
+sleep 0.1
+assert_true(window count = 1, "window still open")
+
+window close "rk_btn_win"
+print "g0110 done"
+exit 0

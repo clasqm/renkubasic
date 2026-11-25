@@ -1,0 +1,13 @@
+// RenkuBASIC CLI test: the error statement
+// Derived from: yabasic 2.92.1 tests/error/explicit_error.yab
+//
+// An explicit error terminates the program with exit status 1 and puts the
+// message on stderr. The runner checks both.
+
+// @expect-exit: 1
+// @expect-stderr-contains: boom
+
+print "before the error"
+error "boom"
+print "this line must not run"
+error "a second error would be a bug"

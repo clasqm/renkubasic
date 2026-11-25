@@ -1,0 +1,54 @@
+// RenkuBASIC CLI test: static variables and numparams
+// Derived from: the static/numparams chapters of the yabasic 2.92.1 manual.
+
+import harness
+
+// static keeps its value between calls, unlike an ordinary local.
+assert_eq(counter(), 1, "static first call")
+assert_eq(counter(), 2, "static second call")
+assert_eq(counter(), 3, "static third call")
+
+sub counter()
+  static n
+  n = n + 1
+  return n
+end sub
+
+// Two different subs have separate statics.
+sub other_counter()
+  static n
+  n = n + 10
+  return n
+end sub
+assert_eq(other_counter(), 10, "static of another sub")
+assert_eq(counter(), 4, "static is per subroutine")
+
+// numparams tells how many arguments were actually passed. Missing arguments
+// are zero / empty.
+assert_eq(count_args(1), 1, "numparams with one argument")
+assert_eq(count_args(1, 2), 2, "numparams with two arguments")
+assert_eq(count_args(1, 2, 3), 3, "numparams with three arguments")
+assert_eq(missing_arg(1), 0, "missing numeric argument is zero")
+assert_str$(missing_str$("a"), "", "missing string argument is empty")
+
+sub count_args(a, b, c)
+  return numparams
+end sub
+
+sub missing_arg(a, b, c)
+  return b
+end sub
+
+sub missing_str$(a$, b$)
+  return b$
+end sub
+
+// The synonym numparam works as well.
+assert_eq(count_args2(1, 2), 2, "numparam synonym")
+
+sub count_args2(a, b, c)
+  return numparam
+end sub
+
+print "c061 done"
+exit 0

@@ -1,0 +1,64 @@
+// RenkuBASIC CLI test: file input and output
+// Derived from: yabasic 2.92.1 tests/io.yab and the file chapters of the
+//               yabasic 2.92.1 manual. The runner gives every test its own
+//               working directory, so relative file names are safe.
+
+import harness
+
+f$ = "rk-file-io.txt"
+
+// Write two lines and a number.
+open f$ for writing as #1
+print #1 "line one"
+print #1 "42"
+print #1 "last"
+close #1
+
+// Read them back.
+open f$ for reading as #1
+line input #1 a$
+input #1 n
+line input #1 b$
+close #1
+assert_str$(a$, "line one", "line input")
+assert_eq(n, 42, "input # reads a number")
+assert_str$(b$, "last", "second line input")
+
+// eof() is true once everything has been read.
+open f$ for reading as #1
+line input #1 a$
+line input #1 b$
+line input #1 c$
+assert_eq(eof(1), 1, "eof after the last line")
+close #1
+
+// Writing again truncates the file.
+open f$ for writing as #1
+print #1 "only"
+close #1
+open f$ for reading as #1
+line input #1 a$
+assert_str$(a$, "only", "reopening for writing truncates")
+close #1
+
+// seek and tell.
+open f$ for reading as #1
+assert_eq(tell(1), 0, "tell at the start")
+seek #1, 2
+assert_eq(tell(1), 2, "tell after seek")
+c = peek(1)
+assert_eq(c, asc("l"), "peek reads the byte at the seek position")  // "only"
+close #1
+
+// Numeric stream numbers work as well as symbolic ones.
+n = 7
+open f$ for writing as #n
+print #n "via variable"
+close #n
+open f$ for reading as #n
+line input #n a$
+close #n
+assert_str$(a$, "via variable", "stream number in a variable")
+
+print "c070 done"
+exit 0

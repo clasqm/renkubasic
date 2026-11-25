@@ -1,0 +1,9 @@
+// RenkuBASIC CLI test: a program without statements produces no output
+// Derived from: yabasic 2.92.1 tests/silent.sh and tests/resources/silent.yab.
+//
+// The runner checks that stdout and stderr stay empty, so a stray banner or
+// warning from the interpreter fails this test.
+
+// @expect-empty-output: 1
+
+rem nothing to see here

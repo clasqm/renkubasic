@@ -1,0 +1,47 @@
+// RenkuBASIC GUI test: views and drawing
+// Derived from: yab 1.8.3 Examples/ColorDemo.yab, MessageWorld.yab,
+//               MouseWorld.yab and FakeTransparency.yab (draw get).
+
+// @requires: gui
+// @timeout: 30
+
+import harness
+
+window open 100, 100 to 500, 400, "rk_draw_win", "RenkuBASIC drawing"
+window set "rk_draw_win", "flags", "not-h-resizable, not-v-resizable"
+
+view 0, 0 to 400, 300, "rk_view", "rk_draw_win"
+
+draw set "bgcolor", 32, 32, 64, "rk_view"
+draw set "lowcolor", 16, 16, 32, "rk_view"
+draw set "highcolor", 255, 255, 255, "rk_view"
+
+// Shapes from yab's draw command set.
+draw line 10, 10 to 200, 30, "rk_view"
+draw rect 10, 40 to 120, 80, "rk_view"
+draw roundrect 10, 90 to 120, 130, 8, 8, "rk_view"
+draw dot 200, 100, "rk_view"
+draw circle 200, 150, 30, "rk_view"
+draw ellipse 260, 150, 40, 20, "rk_view"
+draw arc 300, 150, 30, 30, 0, 180, "rk_view"
+draw curve 10, 200 to 60, 180 to 110, 200 to 160, 180, "rk_view"
+draw triangle 200, 220 to 240, 260 to 160, 260, "rk_view"
+draw polygon 260, 220 to 300, 260 to 340, 220 to 300, 200, "rk_view"
+draw text 10, 270, "RenkuBASIC draws text", "rk_view"
+draw flush "rk_view"
+
+// draw get: the text metrics must be sensible for the current font.
+sleep 0.1
+tw = draw get "text-width", "RenkuBASIC draws text", "rk_view"
+th = draw get "max-text-height", "rk_view"
+assert_true(tw > 0, "text width is positive")
+assert_true(th > 0, "text height is positive")
+
+// A screenshot of the view must produce a real file.
+draw flush "rk_view"
+screenshot 0, 0 to 399, 299, "rk-draw.png"
+assert_true(bfilesize("rk-draw.png") > 100, "screenshot file has content")
+
+window close "rk_draw_win"
+print "g0101 done"
+exit 0

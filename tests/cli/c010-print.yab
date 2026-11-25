@@ -1,0 +1,37 @@
+// RenkuBASIC CLI test: print forms
+// Derived from: yabasic 2.92.1 tests/simple.yab, tests/grammar.yab,
+//               yab 1.8.3 Examples/demo.yab.
+// The `at()` and `colour()` forms of print need a terminal and live in c096.
+
+import harness
+
+// Separators and statement separators must not disturb the values.
+print "a", "b"
+print "c"; : print "d"
+print
+print "e" : print "f"
+
+// Print inside a block.
+for i = 1 to 3
+  print "line ", i
+next i
+
+// Numbers are checked through str$ so the test does not depend on the
+// default output format and on locale.
+assert_str$(str$(1), "1", "str$ integer")
+assert_str$(str$(1/2), "0.5", "str$ fraction")
+assert_str$(str$(-0.25), "-0.25", "str$ negative")
+assert_str$(str$(1e10), "1e+10", "str$ large")
+assert_str$(str$(1/3), "0.333333", "str$ six digits")
+
+// Concatenation in print (the '+' operator, not a separator).
+assert_str$("a" + "b" + "c", "abc", "string concatenation")
+
+// A print statement can be used as the body of a short if.
+x = 0
+if (1 < 2) print "short if body"
+if (1 < 2) x = 1
+assert_eq(x, 1, "short if assignment")
+
+print "c010 done"
+exit 0

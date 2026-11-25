@@ -1,0 +1,46 @@
+// RenkuBASIC CLI test: comparison operators
+// Derived from: yabasic 2.92.1 tests/compare.yab
+
+import harness
+
+// Numeric comparisons, both spellings of equality and inequality.
+assert_true(1 < 2, "1 < 2")
+assert_true(1 <= 1, "1 <= 1")
+assert_true(2 > 1, "2 > 1")
+assert_true(2 >= 2, "2 >= 2")
+assert_true(1 = 1, "1 = 1")
+assert_true(1 == 1, "1 == 1")
+assert_true(1 <> 2, "1 <> 2")
+assert_true(1 != 2, "1 != 2")
+assert_false(1 = 2, "not 1 = 2")
+assert_false(1 == 2, "not 1 == 2")
+assert_false(1 <> 1, "not 1 <> 1")
+assert_false(1 != 1, "not 1 != 1")
+assert_false(2 < 1, "not 2 < 1")
+assert_false(2 <= 1, "not 2 <= 1")
+assert_false(1 > 2, "not 1 > 2")
+assert_false(1 >= 2, "not 1 >= 2")
+
+// String comparisons are lexicographic and case sensitive.
+assert_true("a" = "a", "string equality")
+assert_true("a" == "a", "string equality with ==")
+assert_true("a" <> "b", "string inequality")
+assert_true("a" != "b", "string inequality with !=")
+assert_false("a" = "b", "not a = b")
+assert_false("a" <> "a", "not a <> a")
+assert_true("b" > "a", "b > a")
+assert_true("b" >= "a", "b >= a")
+assert_true("a" < "b", "a < b")
+assert_true("a" <= "b", "a <= b")
+assert_false("b" < "a", "not b < a")
+assert_false("b" <= "a", "not b <= a")
+assert_false("a" > "b", "not a > b")
+assert_false("a" >= "b", "not a >= b")
+assert_false("A" = "a", "string comparison is case sensitive")
+
+// Comparing a string with a number is a parse error in yabasic (there is no
+// implicit conversion), so it cannot be tested from within a program; see
+// tests/cli/c091-errors-syntax.sh.
+
+print "c043 done"
+exit 0

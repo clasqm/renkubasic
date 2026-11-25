@@ -1,0 +1,43 @@
+// RenkuBASIC GUI test: menus and submenus
+// Derived from: yab 1.8.3 Examples/subsubmenu.yab, AllInOne.yab and
+//               Keyboard.yab.
+
+// @requires: gui
+// @timeout: 20
+
+import harness
+
+window open 100, 100 to 460, 320, "rk_menu_win", "RenkuBASIC menus"
+view 0, 0 to 360, 220, "rk_menu_view", "rk_menu_win"
+draw set "bgcolor", 240, 240, 240, "rk_menu_view"
+draw text 10, 30, "menu test window", "rk_menu_view"
+draw flush "rk_menu_view"
+
+// A top level menu with two entries, one of them a separator.
+menu "File", "Open", "O", "rk_menu_win"
+menu "File", "--", "", "rk_menu_win"
+menu "File", "Quit", "Q", "rk_menu_win"
+
+// A submenu and a sub-submenu, as in subsubmenu.yab.
+submenu "File", "Alerts", "", "", "rk_menu_win"
+subsubmenu "File", "Alerts", "Types", "Info", "", "rk_menu_win"
+subsubmenu "File", "Alerts", "Types", "Warning", "", "rk_menu_win"
+
+// Items can be enabled, disabled and marked.
+subsubmenu set "File", "Alerts", "Types", true, "rk_menu_win"
+subsubmenu set "File", "Alerts", "Types", "Info", "mark", "rk_menu_win"
+subsubmenu set "File", "Alerts", "Types", "Warning", "disable", "rk_menu_win"
+
+// Menus have translated identifiers; translate$ must not change an unknown
+// identifier into an empty string.
+t$ = translate$("rk_menu_win:File:Quit")
+assert_true(len(t$) > 0, "translate$ returns something")
+
+// A tooltip on a widget in the same window.
+button 10, 240 to 140, 264, "rk_menu_button", "Button", "rk_menu_win"
+tooltip "rk_menu_button", "menu test button"
+
+sleep 0.1
+window close "rk_menu_win"
+print "g0117 done"
+exit 0

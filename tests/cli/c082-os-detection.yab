@@ -1,0 +1,29 @@
+// RenkuBASIC CLI test: operating system detection (new in RenkuBASIC)
+//
+// The brief for RenkuBASIC asks for "haiku" and "renkuos" as additional values
+// of peek$("os"), next to yabasic's "unix" and "windows". yab programs test
+// `peek$("os") = "Haiku"`, so the historical spelling is available through
+// peek$("yabos") (and through --yab-os-names, see docs/BUILDING.md Q3).
+//
+// @requires: renkubasic
+
+import harness
+
+os$ = peek$("os")
+assert_true(os$ = "haiku" or os$ = "renkuos", "peek$('os') is haiku or renkuos")
+
+yabos$ = peek$("yabos")
+yab_ok = (yabos$ = "Haiku") or (yabos$ = "RenkuOS") or (yabos$ = "BeOS")
+assert_true(yab_ok, "peek$('yabos') is the yab spelling")
+
+// The two spellings refer to the same system, so they must agree.
+if os$ = "haiku" then
+  assert_str$(yabos$, "Haiku", "yabos spells haiku the yab way")
+endif
+
+// The language level is reported independently of the RenkuBASIC release.
+assert_str$(peek$("version"), "2.92.1", "language level stays 2.92.1")
+assert_true(len(peek$("renkuversion")) > 0, "renkuversion is available")
+
+print "c082 done"
+exit 0

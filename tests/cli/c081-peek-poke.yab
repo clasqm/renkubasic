@@ -1,0 +1,30 @@
+// RenkuBASIC CLI test: peek and poke basics
+// Derived from: yab 1.8.3 Examples/Version.yab and the peek/poke chapters of
+//               the yabasic 2.92.1 manual.
+
+import harness
+
+// Version peeks. peek$() returns the full string, peek() the language level as
+// a number ("2.92.1" parses to 2.92).
+assert_str$(peek$("version"), "2.92.1", "peek$ version")
+assert_near(peek("version"), 2.92, 1e-9, "peek version")
+
+// The program is running and time moves.
+assert_true(peek("millisrunning") >= 0, "millisrunning")
+assert_true(peek("secondsrunning") >= 0, "secondsrunning")
+
+// Interpreter state that is always available in the CLI.
+assert_eq(peek("argument"), 0, "argument count")
+assert_true(len(peek$("library")) > 0, "library name")
+assert_true(len(peek$("program_file_name")) > 0, "program_file_name")
+
+// poke of the internal stack assertion (used by the upstream test suite as a
+// cheap way to notice leaks).
+poke "__assert_stack_size", 0
+assert_eq(peek("error"), 0, "error code after a clean run")
+
+// Note: an unknown peek key is a hard error in yabasic 2.92.1 (the program
+// terminates), so it cannot be probed from inside a program.
+
+print "c081 done"
+exit 0

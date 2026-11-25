@@ -1,0 +1,61 @@
+// RenkuBASIC manual test: file panel and popup menu
+// Derived from: yab 1.8.3 Examples/Filepanel.yab, Filebox.yab and
+//               AllInOne.yab.
+//
+// Run with:  tests/run-tests.sh --suite manual --filter m0101
+//
+// A human must confirm:
+//   * "Load file" opens a file panel; picking a file shows its path
+//   * "Save file" opens a save panel; cancelling leaves the view unchanged
+//   * "Popup" shows a popup menu with three entries; the choice is shown
+//   * the window can be closed and the program exits with status 0
+
+// @requires: gui
+// @timeout: 300
+
+window open 200, 200 to 620, 420, "rk_panel_win", "RenkuBASIC file panel"
+layout "left, top", "rk_panel_win"
+
+view 10, 10 to 400, 90, "rk_panel_view", "rk_panel_win"
+draw set "bgcolor", 245, 245, 245, "rk_panel_view"
+draw text 10, 20, "choose a file or a popup entry", "rk_panel_view"
+draw flush "rk_panel_view"
+
+button 10, 105 to 140, 130, "rk_panel_load", "Load file", "rk_panel_win"
+button 10, 140 to 140, 165, "rk_panel_save", "Save file", "rk_panel_win"
+button 10, 175 to 140, 200, "rk_panel_popup", "Popup", "rk_panel_win"
+
+running = true
+while running
+  msg$ = message$
+  switch msg$
+    case "rk_panel_load|"
+      chosen$ = filepanel "Load-File", "Choose a file", "/boot/home", ""
+      if chosen$ <> "" then
+        draw flush "rk_panel_view"
+        draw text 10, 40, "loaded: " + chosen$, "rk_panel_view"
+      endif
+      break
+    case "rk_panel_save|"
+      chosen$ = filepanel "Save-File", "Choose a target", "/boot/home", "rk-test.txt"
+      if chosen$ <> "" then
+        draw flush "rk_panel_view"
+        draw text 10, 60, "target: " + chosen$, "rk_panel_view"
+      endif
+      break
+    case "rk_panel_popup|"
+      pick$ = popupmenu 10, 210, "Foo|--|Bar|Baz", "rk_panel_win"
+      if pick$ <> "" then
+        draw flush "rk_panel_view"
+        draw text 10, 75, "picked: " + pick$, "rk_panel_view"
+      endif
+      break
+    case "rk_panel_win:_QuitRequested|"
+      running = false
+      break
+  end switch
+  sleep 0.02
+wend
+
+window close "rk_panel_win"
+exit 0

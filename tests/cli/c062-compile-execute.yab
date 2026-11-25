@@ -1,0 +1,37 @@
+// RenkuBASIC CLI test: compile, execute, execute$, eval, eval$
+// Derived from: yabasic 2.92.1 tests/compile.yab, tests/eval.yab and the
+//               "Adding new code" chapter of the manual.
+
+import harness
+
+// compile() defines a sub at runtime; execute() calls it.
+compile("sub foo(x):return x+1:end sub")
+for a = 1 to 2
+  assert_eq(execute("foo", a), a + 1, "execute after compile")
+next a
+
+// execute$ calls a runtime sub returning a string.
+compile("sub greet$(n$):return \"hi \" + n$:end sub")
+assert_str$(execute$("greet$", "bob"), "hi bob", "execute$")
+
+// A runtime sub may take several arguments.
+compile("sub add3(a,b,c):return a+b+c:end sub")
+assert_eq(execute("add3", 1, 2, 3), 6, "execute with three arguments")
+
+// eval() compiles and runs a numeric expression.
+assert_eq(eval("1+2"), 3, "eval numeric")
+assert_eq(eval("2*3+4"), 10, "eval precedence")
+x = 7
+assert_eq(eval("x*2"), 14, "eval sees program variables")
+
+// eval$() compiles and runs a string expression.
+assert_str$(eval$("\"foo\" + \"bar\""), "foobar", "eval$ concatenation")
+assert_str$(eval$("left$(\"foo\",1)"), "f", "eval$ with a function")
+
+// eval keeps working in a loop (the compiled expression is reused).
+for n = 1 to 3
+  assert_eq(eval("n*n"), n * n, "eval in a loop")
+next n
+
+print "c062 done"
+exit 0

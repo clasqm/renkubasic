@@ -1,0 +1,38 @@
+// RenkuBASIC GUI test: windows
+// Derived from: yab 1.8.3 Examples/WindowWorld.yab, ButtonWorld.yab.
+//
+// Creates two windows, checks the window count and the window geometry, then
+// closes them again. No user interaction.
+
+// @requires: gui
+// @timeout: 20
+
+import harness
+
+window open 100, 100 to 400, 300, "rk_win1", "RenkuBASIC test window 1"
+window open 420, 100 to 640, 260, "rk_win2", "RenkuBASIC test window 2"
+
+assert_eq(window count, 2, "two windows open")
+
+// Geometry must be readable and plausible (yab reports the frame size).
+sleep 0.1
+w = window get "rk_win1", "width"
+h = window get "rk_win1", "height"
+assert_true(w > 0, "window width")
+assert_true(h > 0, "window height")
+x = window get "rk_win1", "position-x"
+y = window get "rk_win1", "position-y"
+assert_true(x >= 0, "window x position")
+assert_true(y >= 0, "window y position")
+
+// Flags are accepted (the second window must not be resizable).
+window set "rk_win2", "flags", "not-h-resizable, not-v-resizable, not-zoomable"
+window set "rk_win1", "title", "RenkuBASIC renamed"
+
+window close "rk_win1"
+assert_eq(window count, 1, "one window left")
+window close "rk_win2"
+assert_eq(window count, 0, "all windows closed")
+
+print "g0100 done"
+exit 0

@@ -1,0 +1,32 @@
+// RenkuBASIC CLI test: escape sequences in string literals
+// Derived from: yabasic 2.92.1 tests/escape-sequences.yab
+
+import harness
+
+for i = 1 to 11
+  read c$, code
+  assert_eq(asc(c$), code, "escape sequence " + str$(i))
+next i
+
+// A hex escape is exactly one byte.
+assert_str$(chr$(18), "\x12", "\\x12 round trip")
+
+// Escapes inside a longer string keep their neighbours.
+assert_str$("a\tb", "a" + chr$(9) + "b", "tab between characters")
+assert_str$("x\\y", "x" + chr$(92) + "y", "escaped backslash")
+assert_str$("q\"q", "q" + chr$(34) + "q", "escaped quote")
+
+data "\n", 10
+data "\t", 9
+data "\v", 11
+data "\b", 8
+data "\r", 13
+data "\f", 12
+data "\a", 7
+data "\\", 92
+data "\'", 39
+data "\"", 34
+data "\x12", 18
+
+print "c012 done"
+exit 0

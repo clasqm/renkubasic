@@ -1,0 +1,58 @@
+// RenkuBASIC CLI test: rounding and numeric functions
+// Derived from: yabasic 2.92.1 tests/numbers.yab and the number chapters of
+//               the yabasic 2.92.1 manual.
+
+import harness
+
+// int() truncates towards zero, frac() keeps the fractional part.
+assert_eq(int(-2.5), -2, "int(-2.5)")
+assert_eq(int(2.9), 2, "int(2.9)")
+assert_near(frac(-2.5), -0.5, 1e-12, "frac(-2.5)")
+assert_near(frac(2.75), 0.75, 1e-12, "frac(2.75)")
+
+// floor/ceil/round.
+assert_eq(floor(-2.5), -3, "floor(-2.5)")
+assert_eq(floor(2.5), 2, "floor(2.5)")
+assert_eq(ceil(-2.5), -2, "ceil(-2.5)")
+assert_eq(ceil(2.1), 3, "ceil(2.1)")
+assert_eq(round(2.4), 2, "round(2.4)")
+assert_eq(round(2.6), 3, "round(2.6)")
+assert_eq(round(-2.5), -3, "round(-2.5)")
+
+// sign, absolute value, extrema.
+assert_eq(sig(-3), -1, "sig(-3)")
+assert_eq(sig(0), 0, "sig(0)")
+assert_eq(sig(3), 1, "sig(3)")
+assert_eq(abs(-4.5), 4.5, "abs")
+assert_eq(min(3, 7), 3, "min")
+assert_eq(max(3, 7), 7, "max")
+
+// mod, sqr, sqrt.
+assert_eq(mod(7, 3), 1, "mod(7,3)")
+assert_eq(mod(-7, 3), -1, "mod(-7,3) keeps the sign of the dividend")
+assert_eq(sqr(9), 81, "sqr")
+assert_near(sqrt(2), 1.4142135623730951, 1e-12, "sqrt")
+
+// Powers and constants.
+assert_eq(2 ^ 10, 1024, "power operator")
+assert_eq(2 ** 10, 1024, "double star power operator")
+assert_near(pi, 3.14159265358979, 1e-12, "pi")
+assert_near(euler, 2.71828182845905, 1e-12, "euler")
+
+// Trigonometry and logarithms.
+assert_near(sin(0), 0, 1e-12, "sin(0)")
+assert_near(cos(0), 1, 1e-12, "cos(0)")
+assert_near(tan(0), 0, 1e-12, "tan(0)")
+assert_near(atan(1, 1), pi / 4, 1e-12, "atan(y,x)")
+assert_near(exp(0), 1, 1e-12, "exp(0)")
+assert_near(log(euler), 1, 1e-12, "log(euler)")
+assert_near(log(8, 2), 3, 1e-12, "log(x, base)")
+
+// ran() stays within its documented range.
+for i = 1 to 20
+  r = ran(10)
+  assert_true(r >= 0 and r <= 10, "ran(10) in range")
+next i
+
+print "c040 done"
+exit 0

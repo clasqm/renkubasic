@@ -1,0 +1,24 @@
+// RenkuBASIC CLI test: grammar corner cases that only need to compile
+// Derived from: yabasic 2.92.1 tests/grammar.yab
+//
+// This program is never executed beyond the first exit; it exists so that the
+// parser has to accept all of these forms.
+
+exit 0
+
+// eof on a numeric stream and on a hashed stream number
+if (!eof(1)) exit
+if (!eof(#1)) exit
+print #foo bar
+
+// expression precedence bug from yabasic 2.681
+if (1 < 2 and 7) exit
+
+// division by a product
+print a / (b * c)
+
+// various forms of i/o
+close #1 : close #a + 1 : close 1 : close a
+open #1, "a" : open #a, "a" : open #(a + 1), "a"
+print #1 "a" : print #a "a" : print #(a + 1) "a"
+input #1 a : input #a a : input #(a + 1) a

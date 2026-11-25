@@ -1,0 +1,44 @@
+// RenkuBASIC GUI test: tree boxes and column (file) boxes
+// Derived from: yab 1.8.3 Examples/AllInOne.yab, TreeDemo.yab and Filebox.yab.
+
+// @requires: gui
+// @timeout: 20
+
+import harness
+
+window open 100, 100 to 480, 360, "rk_tree_win", "RenkuBASIC tree and columns"
+layout "left, top", "rk_tree_win"
+
+// Tree box: a root with two children.
+treebox 10, 10 to 220, 200, "rk_tree", 1, "rk_tree_win"
+treebox add "rk_tree", "root"
+treebox add "rk_tree", "root", "child one", true
+treebox add "rk_tree", "root", "child two", true
+assert_true(treebox count "rk_tree" >= 3, "treebox count")
+item$ = treebox get$ "rk_tree", 1
+assert_str$(item$, "root", "treebox get the root")
+treebox expand "rk_tree", "root"
+treebox collapse "rk_tree", "root"
+treebox select "rk_tree", 3
+treebox sort "rk_tree"
+
+// Column box: a two column list, as used by yab's Filebox example.
+columnbox 240, 10 to 360, 200, "rk_cols", 1, "", "rk_tree_win"
+columnbox column "rk_cols", " ", 1, 30, 30, 30, "align-center"
+columnbox column "rk_cols", "Name", 2, 90, 90, 90, "align-center"
+columnbox add "rk_cols", 1, 1, 20, ""
+columnbox add "rk_cols", 2, 1, 20, "first"
+columnbox add "rk_cols", 2, 2, 20, "second"
+
+assert_true(columnbox count "rk_cols" >= 2, "columnbox row count")
+assert_eq(columnbox count column "rk_cols", 2, "columnbox column count")
+cell$ = columnbox get$ "rk_cols", 2, 1
+assert_str$(cell$, "first", "columnbox get cell")
+
+columnbox select "rk_cols", 2
+columnbox colour "rk_cols", "bgcolor", 240, 240, 200
+
+sleep 0.1
+window close "rk_tree_win"
+print "g0113 done"
+exit 0

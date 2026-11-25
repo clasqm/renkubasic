@@ -1,0 +1,23 @@
+// Test library for tests/cli/c063-libraries.yab.
+// Imported as `mathx`; exported subs are visible unprefixed.
+
+import helper
+
+export sub square(n)
+  return n * n
+end sub
+
+export sub triple_via_helper(n)
+  return helper.triple(n)
+end sub
+
+export sub own_counter()
+  static n
+  n = n + 1
+  return n
+end sub
+
+// Not exported: only reachable as mathx.hidden()
+sub hidden(n)
+  return n + 1
+end sub

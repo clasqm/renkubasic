@@ -1,0 +1,60 @@
+// RenkuBASIC manual test: the messages widgets send
+// Derived from: yab 1.8.3 Examples/MessageWorld.yab and Keyboard.yab.
+//
+// Run with:  tests/run-tests.sh --suite manual --filter m0102
+//
+// A human must confirm, for every widget:
+//   * clicking / typing / dragging produces a message in the view
+//   * the message text format matches yab 1.8.3
+//     (button "name|", checkbox "name:ON|" / "name:OFF|",
+//      slider "name:value|", textcontrol "name:text|")
+//   * pressing a key with a focused text control shows a keyboard message
+//   * the window can be closed and the program exits with status 0
+
+// @requires: gui
+// @timeout: 600
+
+window open 200, 200 to 700, 520, "rk_msg_win", "RenkuBASIC widget messages"
+layout "left, top", "rk_msg_win"
+
+view 10, 10 to 460, 220, "rk_msg_view", "rk_msg_win"
+draw set "bgcolor", 250, 250, 240, "rk_msg_view"
+draw set "highcolor", 40, 40, 40, "rk_msg_view"
+draw set "DejaVu Sans, Roman, 12", "rk_msg_view"
+draw text 10, 20, "use each widget below", "rk_msg_view"
+draw flush "rk_msg_view"
+
+button 10, 235 to 140, 260, "rk_msg_button", "Button", "rk_msg_win"
+checkbox 10, 270, "rk_msg_check", "Checkbox", false, "rk_msg_win"
+radiobutton 10, 300, "rk_msg_radio", "Radio", true, "rk_msg_win"
+textcontrol 10, 330 to 260, 354, "rk_msg_text", "Type here:", "", "rk_msg_win"
+slider 10, 365 to 260, 395, "rk_msg_slider", "Slider", 1, 100, "rk_msg_win"
+listbox 10, 405 to 140, 490, "rk_msg_list", 1, "rk_msg_win"
+listbox add "rk_msg_list", "red"
+listbox add "rk_msg_list", "green"
+listbox add "rk_msg_list", "blue"
+dropbox 160, 405 to 300, 429, "rk_msg_drop", "Dropbox", "rk_msg_win"
+dropbox add "rk_msg_drop", "one"
+dropbox add "rk_msg_drop", "two"
+
+last$ = ""
+running = true
+while running
+  msg$ = message$
+  if msg$ <> "" and msg$ <> last$ then
+    last$ = msg$
+    draw flush "rk_msg_view"
+    draw text 10, 40, msg$, "rk_msg_view"
+    print msg$
+  endif
+  km$ = keyboard message$("rk_msg_view")
+  if km$ <> "" then
+    draw flush "rk_msg_view"
+    draw text 10, 60, "key: " + km$, "rk_msg_view"
+  endif
+  if msg$ = "rk_msg_win:_QuitRequested|" running = false
+  sleep 0.02
+wend
+
+window close "rk_msg_win"
+exit 0

@@ -1,0 +1,75 @@
+// RenkuBASIC test harness.
+//
+// Usage in a test program:
+//
+//     import harness
+//     assert_eq(2 + 2, 4, "arithmetic")
+//     assert_str$(upper$("ab"), "AB", "upper$")
+//
+// Import with the library path pointing at tests/lib (the runner does this).
+// All helpers are exported, so they are called without the `harness.` prefix;
+// tests that want to exercise namespaces call `harness.assert_eq(...)` instead.
+//
+// Conventions shared with the runner (tests/run-tests.sh):
+//   exit 0   test passed
+//   exit 1   test failed (the helper prints what and why)
+//   exit 77  test skipped (print a reason first; `skip` does both)
+
+export sub assert_eq(got, want, what$)
+  if got <> want then
+    print "  FAIL: ", what$, " -- got ", got, ", expected ", want
+    exit 1
+  endif
+  return 0
+end sub
+
+export sub assert_ne(got, unwanted, what$)
+  if got = unwanted then
+    print "  FAIL: ", what$, " -- got ", got, ", which should not happen"
+    exit 1
+  endif
+  return 0
+end sub
+
+export sub assert_near(got, want, eps, what$)
+  if abs(got - want) > eps then
+    print "  FAIL: ", what$, " -- got ", got, ", expected ", want, " +/- ", eps
+    exit 1
+  endif
+  return 0
+end sub
+
+export sub assert_str$(got$, want$, what$)
+  if got$ <> want$ then
+    print "  FAIL: ", what$, " -- got '", got$, "', expected '", want$, "'"
+    exit 1
+  endif
+  return ""
+end sub
+
+export sub assert_true(cond, what$)
+  if not cond then
+    print "  FAIL: ", what$, " -- condition is false"
+    exit 1
+  endif
+  return 0
+end sub
+
+export sub assert_false(cond, what$)
+  if cond then
+    print "  FAIL: ", what$, " -- condition is true"
+    exit 1
+  endif
+  return 0
+end sub
+
+// Abort the test with a reason the runner reports as a skip.
+export sub skip(reason$)
+  print "  SKIP: ", reason$
+  exit 77
+end sub
+
+// Informational line; only shown by the runner in verbose mode.
+export sub note(what$)
+  print "  note: ", what$
+end sub

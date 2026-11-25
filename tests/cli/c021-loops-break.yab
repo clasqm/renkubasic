@@ -1,0 +1,77 @@
+// RenkuBASIC CLI test: loops, break and continue
+// Derived from: yabasic 2.92.1 tests/break.yab, tests/bugs.yab
+
+import harness
+
+// break in every loop form.
+a = 0
+do
+  break
+  a = 1
+loop
+assert_eq(a, 0, "break in do loop")
+
+a = 0
+while (a <= 3)
+  a = a + 1
+  if a = 2 break
+wend
+assert_eq(a, 2, "break in while loop")
+
+a = 0
+repeat
+  a = a + 1
+  if a = 2 break
+until (a = 4)
+assert_eq(a, 2, "break in repeat loop")
+
+// break out of several loops at once.
+for a = 0 to 4
+  for b = 0 to 4
+    if (a * b = 12) break 2
+  next b
+next a
+assert_eq(a, 3, "break 2 leaves both loops (outer variable)")
+assert_eq(b, 4, "break 2 leaves both loops (inner variable)")
+
+// continue in while and repeat.
+a = 0 : n = 0
+while (a < 4)
+  a = a + 1
+  if a = 2 continue
+  n = n + 1
+wend
+assert_eq(n, 3, "continue in while")
+
+a = 0 : n = 0
+repeat
+  a = a + 1
+  if a = 2 continue
+  n = n + 1
+until (a = 4)
+assert_eq(n, 3, "continue in repeat")
+
+// break and continue inside a switch inside a loop leave the loop alone.
+a = 0
+while (a <= 3)
+  a = a + 1
+  switch a
+    case 1 : break
+    case 2 : continue
+  end switch
+wend
+assert_eq(a, 4, "switch break does not leave the loop")
+
+// A do loop without break runs until the condition inside ends it.
+a = 0
+do
+  a = a + 1
+  if a = 4 break
+loop
+assert_eq(a, 4, "do loop with break at the end")
+
+// The interpreter must not leak its command stack across loops.
+poke "__assert_stack_size", 0
+
+print "c021 done"
+exit 0

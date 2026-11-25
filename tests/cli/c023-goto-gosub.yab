@@ -1,0 +1,68 @@
+// RenkuBASIC CLI test: goto, gosub, label, on goto, on gosub
+// Derived from: yabasic 2.92.1 tests/switch_goto.yab, tests/switch_gosub.yab,
+//               tests/switch_subr.yab and the goto chapter of the manual.
+
+import harness
+
+// Named labels.
+x = 0
+goto skip_me
+x = 1
+label skip_me
+assert_eq(x, 0, "goto jumps over code")
+
+// Numeric labels.
+gosub 100
+y = 7
+goto 200
+label 100
+x = 5
+return
+label 200
+assert_eq(x, 5, "gosub to a numeric label")
+assert_eq(y, 7, "execution resumes after gosub")
+
+// on goto picks the nth label.
+n = 3 : x = 0
+on n goto one, two, three
+x = 99
+goto on_done
+label one
+x = 1
+goto on_done
+label two
+x = 2
+goto on_done
+label three
+x = 3
+label on_done
+assert_eq(x, 3, "on goto selects the third label")
+
+// on gosub picks the nth label and returns.
+x = 0
+on 2 gosub ga, gb
+assert_eq(x, 2, "on gosub runs the second target")
+goto ongosub_done
+label ga
+x = 1
+return
+label gb
+x = 2
+return
+label ongosub_done
+
+// gosub inside a loop.
+total = 0
+for i = 1 to 3
+  gosub add_one
+next i
+assert_eq(total, 3, "gosub inside a loop")
+goto gosub_loop_done
+label add_one
+total = total + 1
+return
+label gosub_loop_done
+
+// A label may also be the target of restore (see c070).
+print "c023 done"
+exit 0

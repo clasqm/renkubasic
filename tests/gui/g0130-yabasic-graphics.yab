@@ -1,0 +1,52 @@
+// RenkuBASIC GUI test: the yabasic graphic window
+//
+// This is the other graphical tradition RenkuBASIC has to keep: yabasic's own
+// `open window` + drawing primitives, with fonts supplied by the Haiku font
+// manager instead of X11 bitmap fonts.
+//
+// @requires: gui
+// @timeout: 30
+
+import harness
+
+open window 200, 150
+backcolor 255, 255, 255
+color 0, 0, 0
+clear window
+
+// Primitives.
+line 10, 10 to 190, 10
+line to 190, 40
+line 10, 40
+rectangle 10, 50 to 90, 90
+fill rectangle 100, 50 to 190, 90
+circle 140, 120, 20
+fill circle 40, 120, 15
+triangle 10, 140 to 60, 140 to 35, 100
+dot 100, 120
+text 10, 20, "yabasic graphic text"
+text 10, 30, "in a TrueType font", "DejaVu Sans, Bold, 14"
+
+// Curves.
+new curve
+line 100, 100 to 120, 90
+line 120, 90 to 140, 100
+close curve
+
+// Read a rectangle back as a bit pattern and draw it somewhere else.
+b$ = getbit$(10, 50, 50, 90)
+assert_true(len(b$) > 0, "getbit$ returns a bitmap string")
+putbit b$ to 150, 100
+
+// The window can be resized and its origin moved.
+window origin "20, 10"
+line 0, 0 to 50, 0
+window origin "0, 0"
+
+// peek of the graphic window size.
+assert_eq(peek("winwidth"), 200, "window width")
+assert_eq(peek("winheight"), 150, "window height")
+
+close window
+print "g0130 done"
+exit 0

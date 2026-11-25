@@ -1,0 +1,13 @@
+// RenkuBASIC CLI test: the bind command is gone
+//
+// The brief removes the ability to bind a program and the interpreter into a
+// standalone executable. In RenkuBASIC the statement must fail with a clear
+// message instead of silently creating a file.
+//
+// @requires: renkubasic
+// @expect-exit: 1
+// @expect-stderr-contains: bind
+
+print "about to try bind"
+bind "rk-should-not-exist"
+print "bind did not fail"

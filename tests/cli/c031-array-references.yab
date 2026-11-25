@@ -1,0 +1,50 @@
+// RenkuBASIC CLI test: array references as subroutine arguments
+// Derived from: yabasic 2.92.1 manual, "References on arrays", and the
+//               yabasic 2.92.1 tests/strdollar.yab style of passing a()/$().
+
+import harness
+
+sub fill_squares(arr(), n)
+  local i
+  for i = 1 to n
+    arr(i) = i * i
+  next i
+  return 0
+end sub
+
+sub total(arr())
+  local i, s
+  for i = 1 to arraysize(arr(), 1)
+    s = s + arr(i)
+  next i
+  return s
+end sub
+
+sub join$(arr$(), sep$)
+  local i, s$
+  for i = 1 to arraysize(arr$(), 1)
+    if i > 1 s$ = s$ + sep$
+    s$ = s$ + arr$(i)
+  next i
+  return s$
+end sub
+
+dim a(5)
+fill_squares(a(), 5)
+assert_eq(a(3), 9, "subroutine filled the caller's array")
+assert_eq(total(a()), 55, "sum of the array through a reference")   // 1+4+9+16+25
+
+dim s$(3)
+s$(1) = "x" : s$(2) = "y" : s$(3) = "z"
+assert_str$(join$(s$(), "-"), "x-y-z", "string array by reference")
+
+// The same array reference may be passed twice.
+dim b(2)
+b(1) = 10 : b(2) = 20
+sub add_arrays(x(), y())
+  return x(1) + y(2)
+end sub
+assert_eq(add_arrays(b(), b()), 30, "array reference passed twice")
+
+print "c031 done"
+exit 0
