@@ -1,0 +1,38 @@
+
+#
+# Process this file (Makefile.am) with automake to generate Makefile.in which in turn will
+# be processed by configure to get Makefile.
+#
+# Please note, that these lines will end up in Makefile.in too (where you may be reading it
+# right now), but meaningful they apply to Makefile.am only.
+#
+
+bin_PROGRAMS = yabasic
+yabasic_SOURCES = main.c function.c io.c graphic.c symbol.c foreign.c flow.c flex.c bison.c whereami.c yabasic.h bison.h whereami.h
+man_MANS = yabasic.1
+LDADD = @X_PRE_LIBS@ -lm @LIBS@ -lX11 @X_LIBS@ @X_EXTRA_LIBS@ $(FFI_LDFLAGS)
+# For profiling add option -pg to AM_CPPFLAGS and AM_LDFLAGS
+# To adhere to the C23 standard add -std=gnu23 to AM_CPPFLAGS
+AM_CPPFLAGS = -DUNIX $(X_CFLAGS) $(FFI_CFLAGS) $(CCOPTIONS) -Wmissing-prototypes
+AM_LDFLAGS = 
+EXTRA_DIST = runme yabasic.htm yabasic.flex yabasic.bison tests configure.ac LICENSE demo.yab $(man_MANS)
+AUTOMAKE_OPTIONS = check-news subdir-objects
+ACLOCAL_AMFLAGS = -I m4
+# Dont enable tests here that need tmux (e.g. inkey.sh); because there is no tmux in the test-system;
+# see https://github.com/marcIhm/yabasic/issues/69
+# Maybe in the future we will be able to specify test-dependencies though.
+TESTS = tests/break.yab tests/bugs.yab tests/grammar.yab tests/io.yab tests/long_variable_name.yab tests/simple.yab tests/switch_continue_break.yab tests/switch_for.yab tests/switch_gosub.yab tests/switch_goto.yab tests/switch_return.yab tests/switch_simple.yab tests/switch_subr.yab tests/switch.yab tests/numbers.yab tests/system.yab tests/string.yab tests/silent.sh tests/nested_import.yab tests/docu.sh tests/read_stdin.sh
+
+# flags for flex (-d for debugging)
+flexflags = -i -I -L -s -d
+
+# create scanner
+flex: yabasic.flex Makefile
+	flex $(flexflags) -t yabasic.flex >flex.c
+
+# flags for bison (-t -v for debugging)
+bisonflags = -d -l -t -v
+
+bison: yabasic.bison Makefile
+	bison $(bisonflags) --output-file bison.c yabasic.bison
+

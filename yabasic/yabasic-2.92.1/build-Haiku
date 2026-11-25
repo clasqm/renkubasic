@@ -1,0 +1,27 @@
+Hi there
+
+I am trying to compile yabasic 2.91.4 in Haiku Beta 5. I've tried both the runme and ./configure&&make
+
+The error I get from make is:
+
+whereami.c:809:2: error: #error unsupported platform
+  809 | #error unsupported platform
+      |  ^~~~~
+make[1]: *** [Makefile:714: whereami.o] Error 1
+
+Yes, I have tried to tinker with whereami.c before, obviously without success. Perhaps a better way would be to spoof the system into thinking that this was some sort of unix box - I know someone managed to compile FreeBASIC for Haiku by pretending to be Solaris. Any input would be appreciated.
+
+In case you're wondering "Why? don't those guys have yab?" Well, yab development has stagnated and they have removed the ncurses dependency completely, so it is no longer useful for CLI development.
+
+The most recent yabasic I've been able to compile on haiku is 2.80.0, and the graphic-window just refuses to work because of the lack of old-fashioned bitmap fonts. That's ok, I am looking for a CLI tool.
+
+Regards
+Michel Clasquin 
+----------------------------------------------
+Hi Michel,
+well, to build without the whoami-functionality, you may:
+	•	Modify find_interpreter in main.c to simply return my_strdup("")
+	•	Edit Makefile.am and remove whoami.c and whoami.h from yabasic_SOURCES
+	•	use automake, configure, etc. as outlined in the comments
+even then, yabasic may come in trouble on startup when trying to check its interpreter, so keep fingers crossed. And of course, the bind-feature will not work.
+regards Marc Ihm

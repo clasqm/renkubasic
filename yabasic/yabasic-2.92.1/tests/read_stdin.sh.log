@@ -1,0 +1,5 @@
+# newline as last char
+1234567890
+# newline as last char
+1234567890
+PASS tests/read_stdin.sh (exit status: 0)
