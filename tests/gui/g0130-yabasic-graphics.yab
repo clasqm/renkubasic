@@ -4,17 +4,28 @@
 // `open window` + drawing primitives, with fonts supplied by the Haiku font
 // manager instead of X11 bitmap fonts.
 //
+// The step marks write the statement being executed to g0130-trace.txt. A
+// hung Haiku program leaves no output behind (stdout is block buffered and the
+// runner kills it), so that file is what says where it stopped.
+//
 // @requires: graphics
 // @timeout: 30
 
 import harness
 
+sub stepmark(s$)
+  open "g0130-trace.txt" for writing as #9
+  print #9 s$
+  close #9
+end sub
+
+stepmark("open window")
 open window 200, 150
 backcolor 255, 255, 255
 color 0, 0, 0
 clear window
 
-// Primitives.
+stepmark("primitives")
 line 10, 10 to 190, 10
 line to 190, 40
 line 10, 40
@@ -25,28 +36,35 @@ fill circle 40, 120, 15
 triangle 10, 140 to 60, 140 to 35, 100
 dot 100, 120
 text 10, 20, "yabasic graphic text"
+
+stepmark("text with a font")
 text 10, 30, "in a TrueType font", "DejaVu Sans, Bold, 14"
 
-// Curves.
+stepmark("curves")
 new curve
 line 100, 100 to 120, 90
 line 120, 90 to 140, 100
 close curve
 
-// Read a rectangle back as a bit pattern and draw it somewhere else.
+stepmark("getbit")
 b$ = getbit$(10, 50, 50, 90)
 assert_true(len(b$) > 0, "getbit$ returns a bitmap string")
+
+stepmark("putbit")
 putbit b$ to 150, 100
 
-// The origin can be moved to another corner of the window.
+stepmark("window origin")
 window origin "cb"
 line 0, 0 to 50, 0
 window origin "lt"
 
-// peek of the graphic window size.
+stepmark("peek")
 assert_eq(peek("winwidth"), 200, "window width")
 assert_eq(peek("winheight"), 150, "window height")
 
+stepmark("close window")
 close window
+
+stepmark("done")
 print "g0130 done"
 exit 0

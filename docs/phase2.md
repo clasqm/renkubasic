@@ -124,6 +124,22 @@ compile with gcc 15.3 and `renkubasic` links against `libbe` and
 `putbit` by the Xlib port, and a possible `snprintf` truncation when splitting
 the font specification.
 
+**Round 3 (2026-11-25, first run on Haiku).** The CLI suite stays at 39 passed,
+0 failed, 2 skipped. The graphic-window probe in the runner (`open window 20,20`
+/ `close window`) passes, so the `graphics` capability is on and g0130/g0131 run
+instead of skipping.
+
+`g0131` failed on its own test code: it used `bfilesize()`, a yab function that
+belongs to the compatibility layer. It now reads the file back with plain
+yabasic and sums `len()` instead.
+
+`g0130` was killed by the runner's 30-second watchdog. On Haiku the watchdog's
+`kill -9` arrives as `SIGKILLTHR` (21), so bash reports exit 149 rather than
+137; the runner now accepts both as a timeout. The test also writes the
+statement it is executing to `g0130-trace.txt`, because a hung program leaves
+no captured output behind (stdout is block buffered), so the next run will say
+which statement does not return.
+
 What the first run has yet to confirm: whether a `BApplication` created on the
 interpreter thread accepts `Run()` on a helper thread (yab instead runs the
 application on the main thread and the interpreter on a helper), and whether

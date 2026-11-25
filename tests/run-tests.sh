@@ -381,7 +381,9 @@ for f in "${FILES[@]}"; do
   kill "$watchdog" 2>/dev/null
   wait "$watchdog" 2>/dev/null
 
-  if [ "$status" = "137" ]; then
+  # 137 is 128+SIGKILL. Haiku's bash reports 149 here instead: a process id is
+  # a thread id there, so the watchdog's kill -9 arrives as SIGKILLTHR (21).
+  if [ "$status" = "137" ] || [ "$status" = "149" ]; then
     echo "FAIL  $name  (timeout after ${tmo}s)"
     show_output "$out" "$err" 15
     FAIL=$((FAIL + 1))

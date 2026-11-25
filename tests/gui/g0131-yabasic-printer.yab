@@ -22,12 +22,19 @@ clear window          // starts a second page
 circle 100, 75, 40
 close printer
 
-assert_true(bfilesize("rk-print.ps") > 100, "PostScript file written")
-
-// A print file must look like PostScript, not like an empty file.
+// The file must actually contain the drawing: count the characters read back.
+// bfilesize() is a yab function, not a yabasic one, so this test cannot use it.
 open "rk-print.ps" for reading as #1
 line input #1 header$
+total = len(header$)
+while not eof(1)
+  line input #1 l$
+  total = total + len(l$)
+wend
 close #1
+assert_true(total > 100, "PostScript file written")
+
+// A print file must look like PostScript, not like an empty file.
 assert_true(glob(header$, "%!PS*"), "print file starts with the PostScript header")
 
 close window
