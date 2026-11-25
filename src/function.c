@@ -1887,6 +1887,15 @@ static char *peek2(char *dest, struct command *curr) /* peek into internals */
     return my_strdup(inter_path);
   } else if (!strcmp(dest, "library")) {
     return my_strdup(curr->lib->short_name);
+  } else if (!strcmp(dest, "directory")) {
+    /* yab 1.8.3 extension (Examples/Version.yab prints it). yab reports its
+       application directory; a command line interpreter has no single such
+       directory, so report the program's working directory. */
+    char cwd[INBUFFLEN];
+    if (getcwd(cwd, sizeof(cwd))) {
+      return my_strdup(cwd);
+    }
+    return my_strdup(".");
   } else if (!strcmp(dest, "version")) {
     return my_strdup(PACKAGE_VERSION);
   } else if (!strcmp(dest, "os")) {

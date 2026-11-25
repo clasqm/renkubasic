@@ -53,7 +53,7 @@ char *fontname = NULL;
 int drawmode = 0;
 int winpid = 0;
 int termpid = 0;
-int backpid = 0;
+int backpid = -1;
 
 static char *printerfilename = NULL;
 
