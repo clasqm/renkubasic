@@ -126,6 +126,27 @@ if [ ! -x "$INTERP" ]; then
   exit 2
 fi
 
+# Make the interpreter path absolute. Each test runs inside its own scratch
+# directory, so a relative --interpreter (build/renkubasic) would otherwise
+# stop resolving once the runner changes directory.
+case "$INTERP" in
+  /*) : ;;
+  */*)
+    absdir=$(cd "$(dirname "$INTERP")" 2>/dev/null && pwd) || {
+      echo "error: cannot resolve the interpreter path '$INTERP'" >&2
+      exit 2
+    }
+    INTERP="$absdir/$(basename "$INTERP")"
+    ;;
+  *)
+    resolved=$(command -v "$INTERP") || {
+      echo "error: cannot resolve the interpreter '$INTERP'" >&2
+      exit 2
+    }
+    INTERP="$resolved"
+    ;;
+esac
+
 # Environment for shell tests.
 export RK_INTERP="$INTERP"
 export RK_TESTS="$HERE"
