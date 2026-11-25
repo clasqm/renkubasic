@@ -356,10 +356,14 @@ directive in the test header, and every skip prints its reason.
 
 **Phase 2 — Haiku/RenkuOS API and GUI**
 
-* Graphic window on `BBitmap`/`BWindow` with TrueType fonts; screenshot, getbit/putbit,
-  printer-to-PostScript.
-* yab compatibility layer ported; widget, event and BFS helpers work.
-* Acceptance: `tests/gui` passes; `tests/manual` checklist signed off.
+* [x] Graphic window on `BBitmap`/`BWindow` with TrueType fonts; screenshot,
+  getbit/putbit. See `docs/phase2.md`.
+* [x] yabasic drawing commands ported onto the Haiku bridge (`src/rk_graphics.c`),
+  printer-to-PostScript writes a file.
+* [ ] Send the PostScript file to the Haiku print server.
+* [ ] yab compatibility layer ported (`src/yabcompat/`): widget, event and BFS
+  helpers work.
+* [ ] Acceptance: `tests/gui` passes; `tests/manual` checklist signed off.
 
 **Phase 3 — documentation**
 
@@ -425,9 +429,8 @@ unmodified yab programs take the right font branch. Alternative: always return `
 (matches yab, contradicts the lowercase wording of the brief).
 
 **Q4 — scope of the yab GUI port in Phase 2.**
-Proposal: port every widget/view and the file/attribute/sound helpers, but treat
-`popupmenu`, `filepanel`, `alert` and `mediasound` as "manual-test only" (they are modal or
-media-dependent). Everything else gets an automated GUI test.
+**APPROVED 2026-11-25: port every widget/view and the file/attribute/sound helpers;
+`popupmenu`, `filepanel`, `alert` and `mediasound` are manual-test only.**
 
 **Q5 — version numbering.**
 Proposal: RenkuBASIC 0.1.0 for the first working build; language level always reported

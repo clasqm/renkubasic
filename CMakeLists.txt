@@ -8,10 +8,12 @@
 # and `make clean` in the same directory. No install step is required.
 
 cmake_minimum_required(VERSION 3.16)
-project(renkubasic C)
+project(renkubasic C CXX)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type" FORCE)
@@ -36,6 +38,7 @@ set(RK_SOURCES
   src/bison.c
   src/rk_platform.c
   src/rk_graphics.c
+  src/rk_gui.cpp
 )
 
 add_executable(renkubasic ${RK_SOURCES})
@@ -60,9 +63,22 @@ target_include_directories(renkubasic PRIVATE
   ${CURSES_INCLUDE_DIRS}
 )
 
-target_compile_options(renkubasic PRIVATE -Wall -Wmissing-prototypes)
+# -Wmissing-prototypes only makes sense for the C sources; the C++ backend has
+# no C prototypes to miss.
+target_compile_options(renkubasic PRIVATE -Wall
+  "$<$<COMPILE_LANGUAGE:C>:-Wmissing-prototypes>")
 
-target_link_libraries(renkubasic PRIVATE ${CURSES_LIBRARIES} m)
+# The graphic window uses the Haiku application kit (BApplication, BWindow,
+# BBitmap, BFont) and the translation kit to encode screenshots as PNG.
+find_library(HAIKU_BE_LIBRARY NAMES be)
+find_library(HAIKU_TRANSLATION_LIBRARY NAMES translation)
+if(NOT HAIKU_BE_LIBRARY OR NOT HAIKU_TRANSLATION_LIBRARY)
+  message(FATAL_ERROR
+    "RenkuBASIC needs the Haiku kits: libbe (application kit) and libtranslation")
+endif()
+
+target_link_libraries(renkubasic PRIVATE ${CURSES_LIBRARIES} m
+  ${HAIKU_BE_LIBRARY} ${HAIKU_TRANSLATION_LIBRARY})
 
 # yabasic's man page and HTML manual are replaced by docs/manual in phase 3;
 # until then the original page is installed unchanged so `man renkubasic`

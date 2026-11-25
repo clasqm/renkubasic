@@ -55,7 +55,8 @@ in a `.yab` file or `# @key: value` in a `.sh` file.
 | Directive | Meaning |
 | --- | --- |
 | `@requires: renkubasic` | skip when the interpreter is not RenkuBASIC (used for the new requirements) |
-| `@requires: gui` | skip when `window open` fails (no app server) |
+| `@requires: gui` | skip when yab's `window open` fails (widget layer not built yet, or no app server) |
+| `@requires: graphics` | skip when the yabasic graphic window cannot be opened |
 | `@requires: pty` | skip when `script(1)` is missing |
 | `@requires: ffi` | skip when the foreign function interface answers nothing |
 | `@requires: haiku` | skip unless `peek$("os")` is `haiku` or `renkuos` |

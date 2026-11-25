@@ -4,7 +4,7 @@
 // `open window` + drawing primitives, with fonts supplied by the Haiku font
 // manager instead of X11 bitmap fonts.
 //
-// @requires: gui
+// @requires: graphics
 // @timeout: 30
 
 import harness
@@ -38,10 +38,10 @@ b$ = getbit$(10, 50, 50, 90)
 assert_true(len(b$) > 0, "getbit$ returns a bitmap string")
 putbit b$ to 150, 100
 
-// The window can be resized and its origin moved.
-window origin "20, 10"
+// The origin can be moved to another corner of the window.
+window origin "cb"
 line 0, 0 to 50, 0
-window origin "0, 0"
+window origin "lt"
 
 // peek of the graphic window size.
 assert_eq(peek("winwidth"), 200, "window width")

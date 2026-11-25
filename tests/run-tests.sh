@@ -193,6 +193,25 @@ else
   GUI_OK=0
 fi
 
+# The yabasic graphic window is a separate capability from yab's widget
+# windows: it can exist before the compatibility layer does.
+GRAPHICS_OK=0
+probe_graphics() {
+  local probe="$SCRATCH/graphics-probe.yab"
+  local log="$SCRATCH/graphics-probe.log"
+  cat > "$probe" <<'PROBE'
+open window 20, 20
+close window
+exit 0
+PROBE
+  ( cd "$SCRATCH_RUN" && "$INTERP" "$probe" >"$log" 2>&1 )
+}
+if [ "$IS_RENKU" = "1" ]; then
+  case " $SUITE_DIRS " in
+    *" gui "*) if probe_graphics; then GRAPHICS_OK=1; fi ;;
+  esac
+fi
+
 # --- helpers ---------------------------------------------------------------
 
 matches_filter() {
@@ -214,6 +233,7 @@ requirement_met() {
   case "$1" in
     renkubasic) [ "$IS_RENKU" = "1" ] ;;
     gui) [ "$GUI_OK" = "1" ] ;;
+    graphics) [ "$GRAPHICS_OK" = "1" ] ;;
     pty) [ "$HAS_PTY" = "1" ] ;;
     haiku) case "$OSNAME" in haiku|renkuos) return 0 ;; *) return 1 ;; esac ;;
     ffi)

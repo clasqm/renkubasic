@@ -14,7 +14,8 @@
 /* ------------- includes ---------------- */
 
 #ifndef YABASIC_INCLUDED
-#include "yabasic.h" /* all prototypes and structures */
+#include "yabasic.h"
+#include "rk_gui.h" /* all prototypes and structures */
 #endif
 #include "bison.h"
 #include "rk_platform.h"
@@ -1021,6 +1022,7 @@ static void end_it(void) /* perform shutdown-operations */
     DeleteDC(printer);
   }
 #endif
+  rk_gui_shutdown();
   exit(exitcode);
 }
 

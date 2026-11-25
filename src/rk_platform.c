@@ -11,6 +11,7 @@
 
 #include "yabasic.h"
 #include "rk_platform.h"
+#include "rk_gui.h"
 
 #include <string.h>
 
@@ -115,20 +116,13 @@ const char *rk_default_library_path(void) {
   return path;
 }
 
-int rk_graphics_available(void) {
-  /* Phase 2 supplies the BWindow/BBitmap backend. Until then the window
-     commands must say so rather than silently drawing into nothing. */
-  return FALSE;
-}
+int rk_graphics_available(void) { return rk_gui_available(); }
 
 int rk_window_fd(void) {
-  /* A Haiku BWindow is not a file descriptor; phase 2 will either poll its
-     message port from here or return -1 and let the application poll through
-     rk_window_pending(). */
+  /* A BWindow is not a file descriptor. Window keys are buffered by the
+     backend and reported through rk_window_pending(); inkey$ still waits on
+     the terminal descriptor, which is where console input arrives. */
   return -1;
 }
 
-int rk_window_pending(void) {
-  /* No window backend yet, so no window key can be waiting. */
-  return FALSE;
-}
+int rk_window_pending(void) { return rk_gui_key_pending(); }

@@ -4,7 +4,7 @@
 // changes (a file handed to the print server, never /usr/bin/lpr), but writing
 // to an explicit filename stays the same and can be checked automatically.
 //
-// @requires: gui
+// @requires: graphics
 // @timeout: 30
 
 import harness
