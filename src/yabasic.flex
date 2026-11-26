@@ -241,12 +241,36 @@ TRIANGLE return tTRIANGLE;
 CLEAR return tCLEAR;
 FILL return tFILL;
 FILLED return tFILL;
-TEXT return tTEXT;
+TEXT {BEGIN(YABKEY);return tTEXT;}
 RECTANGLE return tRECT;
 RECT return tRECT;
 BOX return tRECT;
-<YABKEY>SET {BEGIN(INITIAL);return tSET;}
-<YABKEY>GET {BEGIN(INITIAL);return tGET;}
+BUTTON {BEGIN(YABKEY);return tBUTTON;}
+CHECKBOX {BEGIN(YABKEY);return tCHECKBOX;}
+RADIOBUTTON {BEGIN(YABKEY);return tRADIOBUTTON;}
+TEXTCONTROL {BEGIN(YABKEY);return tTEXTCONTROL;}
+TEXTEDIT {BEGIN(YABKEY);return tTEXTEDIT;}
+TEXTURL {BEGIN(YABKEY);return tTEXTURL;}
+SLIDER {BEGIN(YABKEY);return tSLIDER;}
+STATUSBAR {BEGIN(YABKEY);return tSTATUSBAR;}
+SPINCONTROL {BEGIN(YABKEY);return tSPINCONTROL;}
+SCROLLBAR {BEGIN(YABKEY);return tSCROLLBAR;}
+LAYOUT {BEGIN(YABKEY);return tLAYOUT;}
+TOOLTIP {BEGIN(YABKEY);return tTOOLTIP;}
+OPTION {BEGIN(YABKEY);return tOPTION;}
+TABVIEW {BEGIN(YABKEY);return tTABVIEW;}
+BOXVIEW {BEGIN(YABKEY);return tBOXVIEW;}
+SPLITVIEW {BEGIN(YABKEY);return tSPLITVIEW;}
+STACKVIEW {BEGIN(YABKEY);return tSTACKVIEW;}
+CANVAS {BEGIN(YABKEY);return tCANVAS;}
+REGION {BEGIN(YABKEY);return tREGION;}
+  /* The command words are keywords only directly after a command keyword, and
+     only when the whole word was written: `text 1, 2, set$` still scans set$
+     as a string variable, while `text set "id", "centre"` gets tSET. */
+<YABKEY>SET/[ \t] {BEGIN(INITIAL);return tSET;}
+<YABKEY>GET/[ \t] {BEGIN(INITIAL);return tGET;}
+<YABKEY>ADD/[ \t] {BEGIN(INITIAL);return tADD;}
+<YABKEY>REMOVE/[ \t] {BEGIN(INITIAL);return tREMOVE;}
 <YABKEY>COUNT {BEGIN(INITIAL);return tCOUNT;}
 <YABKEY>{WS}+ ; /* skip blanks between the command words */
 <YABKEY>\n {yycolumn=1;BEGIN(INITIAL);yylval.nnl=1;return tSEP;}

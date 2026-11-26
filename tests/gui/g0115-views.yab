@@ -21,7 +21,7 @@ tabview add "rk_tabs", "Third"
 
 // Box view with a title.
 boxview 280, 10 to 440, 120, "rk_box", "a box", 2, "rk_views_win"
-boxview set "rk_box", "still a box", "with a title"
+boxview set "rk_box", "label", "still a box"
 
 // Split view: horizontal, two panes.
 splitview 10, 220 to 260, 300, "rk_split", true, false, "rk_views_win"

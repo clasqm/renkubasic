@@ -56,6 +56,16 @@ static void expect(int ok) {
   }
 }
 
+void rk_yab_note_font(const char *spec) {
+  if (!spec || !*spec) {
+    return;
+  }
+  if (fontname) {
+    my_free(fontname);
+  }
+  fontname = (char *)my_strdup((char *)spec);
+}
+
 void rk_yab_check(void) {
   const char *message = rk_yab_last_error();
 
@@ -109,7 +119,13 @@ void rk_yab_command(struct command *cmd) {
     char *view = take_string();
     char *value = take_string();
 
-    expect(rk_yab_view_set_font(value, view));
+    if (!rk_yab_view_set_font(value, view)) {
+      report_failure();
+    } else {
+      /* The yab font command is this program's idea of "the font", so make
+         peek$("font") agree with it. */
+      rk_yab_note_font(value);
+    }
     break;
   }
   case cYABDRAWSETCOLOUR: {
@@ -243,6 +259,426 @@ void rk_yab_command(struct command *cmd) {
     double x1 = take_number();
 
     expect(rk_yab_screenshot(x1, y1, x2, y2, path));
+    break;
+  }
+  /* ---- widgets ------------------------------------------------------- */
+  case cYABLAYOUT: {
+    char *view = take_string();
+    char *spec = take_string();
+
+    expect(rk_yab_layout(spec, view));
+    break;
+  }
+  case cYABBUTTON: {
+    char *view = take_string();
+    char *label = take_string();
+    char *id = take_string();
+    double y2 = take_number();
+    double x2 = take_number();
+    double y1 = take_number();
+    double x1 = take_number();
+
+    expect(rk_yab_button(x1, y1, x2, y2, id, label, view));
+    break;
+  }
+  case cYABCHECKBOX: {
+    char *view = take_string();
+    int checked = (int)take_number();
+    char *label = take_string();
+    char *id = take_string();
+    double y = take_number();
+    double x = take_number();
+
+    expect(rk_yab_checkbox(x, y, id, label, checked, view));
+    break;
+  }
+  case cYABCHECKBOXSET: {
+    double checked = take_number();
+    char *id = take_string();
+
+    expect(rk_yab_checkbox_set(id, (int)checked));
+    break;
+  }
+  case cYABRADIOBUTTON: {
+    char *view = take_string();
+    int checked = (int)take_number();
+    char *label = take_string();
+    char *id = take_string();
+    double y = take_number();
+    double x = take_number();
+
+    expect(rk_yab_radiobutton(x, y, id, label, checked, view));
+    break;
+  }
+  case cYABRADIOSET: {
+    double checked = take_number();
+    char *id = take_string();
+
+    expect(rk_yab_radiobutton_set(id, (int)checked));
+    break;
+  }
+  case cYABTEXT: {
+    char *view = take_string();
+    char *text = take_string();
+    char *id = take_string();
+    double y = take_number();
+    double x = take_number();
+
+    expect(rk_yab_text(x, y, id, text, view));
+    break;
+  }
+  case cYABTEXTALIGN: {
+    char *align = take_string();
+    char *id = take_string();
+
+    expect(rk_yab_text_align(id, align));
+    break;
+  }
+  case cYABTEXTURL: {
+    char *view = take_string();
+    char *url = take_string();
+    char *text = take_string();
+    char *id = take_string();
+    double y = take_number();
+    double x = take_number();
+
+    expect(rk_yab_text_url(x, y, id, text, url, view));
+    break;
+  }
+  case cYABTEXTCONTROL: {
+    char *view = take_string();
+    char *value = take_string();
+    char *label = take_string();
+    char *id = take_string();
+    double y2 = take_number();
+    double x2 = take_number();
+    double y1 = take_number();
+    double x1 = take_number();
+
+    expect(rk_yab_textcontrol(x1, y1, x2, y2, id, label, value, view));
+    break;
+  }
+  case cYABTEXTCONTROLSET: {
+    char *value = take_string();
+    char *id = take_string();
+
+    expect(rk_yab_textcontrol_set(id, value));
+    break;
+  }
+  case cYABTEXTCONTROLMASK: {
+    double masked = take_number();
+    char *id = take_string();
+
+    expect(rk_yab_textcontrol_mask(id, (int)masked));
+    break;
+  }
+  case cYABTEXTCONTROLCLEAR: {
+    char *id = take_string();
+
+    expect(rk_yab_textcontrol_clear(id));
+    break;
+  }
+  case cYABTEXTEDIT: {
+    char *view = take_string();
+    int scrollbar = (int)take_number();
+    char *id = take_string();
+    double y2 = take_number();
+    double x2 = take_number();
+    double y1 = take_number();
+    double x1 = take_number();
+
+    expect(rk_yab_textedit(x1, y1, x2, y2, id, scrollbar, view));
+    break;
+  }
+  case cYABTEXTEDITADD: {
+    char *text = take_string();
+    char *id = take_string();
+
+    expect(rk_yab_textedit_add(id, text));
+    break;
+  }
+  case cYABTEXTEDITSET: {
+    char *text = take_string();
+    char *id = take_string();
+
+    expect(rk_yab_textedit_set(id, text));
+    break;
+  }
+  case cYABTEXTEDITCLEAR: {
+    char *id = take_string();
+
+    expect(rk_yab_textedit_clear(id));
+    break;
+  }
+  case cYABTEXTEDITCOLOUR: {
+    int b = (int)take_number();
+    int g = (int)take_number();
+    int r = (int)take_number();
+    char *property = take_string();
+    char *id = take_string();
+
+    expect(rk_yab_textedit_colour(id, property, r, g, b));
+    break;
+  }
+  case cYABSLIDER:
+  case cYABSLIDEROPT: {
+    char *view = take_string();
+    char *options = NULL;
+    if (cmd->type == cYABSLIDEROPT) {
+      options = take_string();
+    }
+    double maximum = take_number();
+    double minimum = take_number();
+    char *label = take_string();
+    char *id = take_string();
+    double y2 = take_number();
+    double x2 = take_number();
+    double y1 = take_number();
+    double x1 = take_number();
+
+    expect(rk_yab_slider(x1, y1, x2, y2, id, label, minimum, maximum, options,
+                         view));
+    break;
+  }
+  case cYABSLIDERSET: {
+    double value = take_number();
+    char *id = take_string();
+
+    expect(rk_yab_slider_set(id, value));
+    break;
+  }
+  case cYABSLIDERMARKS: {
+    double count = take_number();
+    char *location = take_string();
+    char *id = take_string();
+
+    expect(rk_yab_slider_marks(id, location, count));
+    break;
+  }
+  case cYABSLIDERLABEL: {
+    char *maximum = take_string();
+    char *minimum = take_string();
+    char *id = take_string();
+
+    expect(rk_yab_slider_labels(id, minimum, maximum));
+    break;
+  }
+  case cYABSLIDERCOLOUR: {
+    int b = (int)take_number();
+    int g = (int)take_number();
+    int r = (int)take_number();
+    char *property = take_string();
+    char *id = take_string();
+
+    expect(rk_yab_slider_colour(id, property, r, g, b));
+    break;
+  }
+  case cYABSCROLLBAR: {
+    char *view = take_string();
+    int bars = (int)take_number();
+    char *id = take_string();
+
+    expect(rk_yab_scrollbar(id, bars, view));
+    break;
+  }
+  case cYABSCROLLBARSET: {
+    double value = take_number();
+    char *property = take_string();
+    char *id = take_string();
+
+    expect(rk_yab_scrollbar_set(id, property, value, 0.0, 0));
+    break;
+  }
+  case cYABSCROLLBARRANGE: {
+    double other = take_number();
+    double value = take_number();
+    char *property = take_string();
+    char *id = take_string();
+
+    expect(rk_yab_scrollbar_set(id, property, value, other, 1));
+    break;
+  }
+  case cYABSTATUSBAR: {
+    char *view = take_string();
+    char *trailing = take_string();
+    char *label = take_string();
+    char *id = take_string();
+    double y2 = take_number();
+    double x2 = take_number();
+    double y1 = take_number();
+    double x1 = take_number();
+
+    expect(rk_yab_statusbar(x1, y1, x2, y2, id, label, trailing, view));
+    break;
+  }
+  case cYABSTATUSBARSET: {
+    double percent = take_number();
+    char *trailing = take_string();
+    char *label = take_string();
+    char *id = take_string();
+
+    expect(rk_yab_statusbar_set(id, label, trailing, percent));
+    break;
+  }
+  case cYABSPINCONTROL: {
+    char *view = take_string();
+    double step = take_number();
+    double maximum = take_number();
+    double minimum = take_number();
+    char *label = take_string();
+    char *id = take_string();
+    double y = take_number();
+    double x = take_number();
+
+    expect(rk_yab_spincontrol(x, y, id, label, minimum, maximum, step, view));
+    break;
+  }
+  case cYABSPINCONTROLSET: {
+    double value = take_number();
+    char *id = take_string();
+
+    expect(rk_yab_spincontrol_set(id, value));
+    break;
+  }
+  case cYABOPTIONTEXT: {
+    char *text = take_string();
+    char *property = take_string();
+    char *id = take_string();
+
+    expect(rk_yab_option_set(id, property, text));
+    break;
+  }
+  case cYABOPTIONNUMBER: {
+    double value = take_number();
+    char *property = take_string();
+    char *id = take_string();
+
+    expect(rk_yab_option_set_number(id, property, value));
+    break;
+  }
+  case cYABOPTIONCOLOUR: {
+    int b = (int)take_number();
+    int g = (int)take_number();
+    int r = (int)take_number();
+    char *property = take_string();
+    char *id = take_string();
+
+    expect(rk_yab_option_colour(id, property, r, g, b));
+    break;
+  }
+  case cYABTOOLTIP: {
+    char *text = take_string();
+    char *id = take_string();
+
+    expect(rk_yab_tooltip(id, text));
+    break;
+  }
+  case cYABTABVIEW: {
+    char *view = take_string();
+    char *side = take_string();
+    char *id = take_string();
+    double y2 = take_number();
+    double x2 = take_number();
+    double y1 = take_number();
+    double x1 = take_number();
+
+    expect(rk_yab_tabview(x1, y1, x2, y2, id, side, view));
+    break;
+  }
+  case cYABTABADD: {
+    char *label = take_string();
+    char *id = take_string();
+
+    expect(rk_yab_tab_add(id, label));
+    break;
+  }
+  case cYABTABSET: {
+    double index = take_number();
+    char *id = take_string();
+
+    expect(rk_yab_tab_set(id, index));
+    break;
+  }
+  case cYABTABREMOVE: {
+    double index = take_number();
+    char *id = take_string();
+
+    expect(rk_yab_tab_remove(id, index));
+    break;
+  }
+  case cYABBOXVIEW: {
+    char *view = take_string();
+    int line_type = (int)take_number();
+    char *label = take_string();
+    char *id = take_string();
+    double y2 = take_number();
+    double x2 = take_number();
+    double y1 = take_number();
+    double x1 = take_number();
+
+    expect(rk_yab_boxview(x1, y1, x2, y2, id, label, line_type, view));
+    break;
+  }
+  case cYABBOXVIEWSET: {
+    char *value = take_string();
+    char *option = take_string();
+    char *id = take_string();
+
+    expect(rk_yab_boxview_set(id, option, value));
+    break;
+  }
+  case cYABSPLITVIEW: {
+    char *view = take_string();
+    int style = (int)take_number();
+    int vertical = (int)take_number();
+    char *id = take_string();
+    double y2 = take_number();
+    double x2 = take_number();
+    double y1 = take_number();
+    double x1 = take_number();
+
+    expect(rk_yab_splitview(x1, y1, x2, y2, id, vertical, style, view));
+    break;
+  }
+  case cYABSTACKVIEW: {
+    char *view = take_string();
+    int pages = (int)take_number();
+    char *id = take_string();
+    double y2 = take_number();
+    double x2 = take_number();
+    double y1 = take_number();
+    double x1 = take_number();
+
+    expect(rk_yab_stackview(x1, y1, x2, y2, id, pages, view));
+    break;
+  }
+  case cYABSTACKVIEWSET: {
+    double index = take_number();
+    char *id = take_string();
+
+    expect(rk_yab_stackview_set(id, index));
+    break;
+  }
+  case cYABCANVAS: {
+    char *view = take_string();
+    char *id = take_string();
+    double y2 = take_number();
+    double x2 = take_number();
+    double y1 = take_number();
+    double x1 = take_number();
+
+    expect(rk_yab_canvas(x1, y1, x2, y2, id, view));
+    break;
+  }
+  case cYABREGION: {
+    char *view = take_string();
+    char *id = take_string();
+    double y2 = take_number();
+    double x2 = take_number();
+    double y1 = take_number();
+    double x1 = take_number();
+
+    expect(rk_yab_region(x1, y1, x2, y2, id, view));
     break;
   }
   default:

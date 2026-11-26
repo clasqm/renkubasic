@@ -18,4 +18,9 @@ void rk_yab_command(struct command *cmd);
    every getter. */
 void rk_yab_check(void);
 
+/* Record the font a program selected with `draw set`, so yabasic's own
+   peek$("font") reports it. A yab program picks its font with the draw command,
+   not with yabasic's `font` command, and g0103 reads it back. */
+void rk_yab_note_font(const char *spec);
+
 #endif /* RK_YAB_RUNTIME_H */

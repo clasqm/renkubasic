@@ -2,9 +2,9 @@
 
 Phase 2 replaces yabasic's Xlib graphic window with a Haiku window and adds the
 yab compatibility layer. This document records both slices: the graphic window
-and the first part of the yab layer (`src/yabcompat/`), which now runs yab's
-`window`, `view` and `draw` commands. Buttons, lists, menus and the rest of the
-widget set are the next slice.
+and the yab layer (`src/yabcompat/`), which runs yab's `window`, `view` and
+`draw` commands plus the widget controls, text, sliders, containers and
+`canvas`/`region`. Lists, menus, the clipboard and bitmaps are the next slices.
 
 ## What exists now
 
@@ -20,7 +20,10 @@ widget set are the next slice.
 | Haiku print server | — | not started |
 | yab grammar for `window`, `view`, `draw`, `screenshot` | `src/yabasic.bison`, `src/yabasic.flex` | done |
 | yab windows, views, drawing | `src/yabcompat/rk_yab.cpp` | done for the command set below |
-| yab controls, lists, menus, bitmap, canvas | `src/yabcompat/` | not started; those tests ask for `gui-widgets` and skip |
+| yab widget controls, text, sliders, containers, `canvas`/`region` | `src/yabcompat/rk_yab.cpp` | done; the `gui-widgets` tests run |
+| yab lists, tree/column, calendar, colour control | `src/yabcompat/` | not started; those tests ask for `gui-lists` |
+| yab menus and clipboard | `src/yabcompat/` | not started; those tests ask for `gui-menus` |
+| yab bitmap | `src/yabcompat/` | not started; that test asks for `gui-bitmaps` |
 
 ## Design decisions
 
@@ -69,10 +72,19 @@ There are now two yab capabilities, because the layer arrives in slices:
 * `gui` — the window, view and draw commands. Probed with a program that opens
   and closes a window. `g0100`, `g0101`, `g0103` and `g0119` run with it.
 * `gui-widgets` — buttons and the other controls. Probed with a program that
-  creates a `button`; until that command exists the probe fails with a syntax
-  error and the eleven widget tests skip with `(requires gui-widgets)`. When
-  the widget slice lands, the tag comes off those tests one group at a time and
-  the probe starts passing on its own.
+  creates a `button`. It now covers `g0102` (canvas/region), `g0110` (buttons,
+  check boxes, radio buttons), `g0111` (text labels, text control, text edit),
+  `g0114` (sliders, scrollbar, status bar, spin control, stack view) and `g0115`
+  (tab, box, split and stack views).
+* `gui-lists` — `listbox`, `dropbox`, `treebox`, `columnbox`, `calendar` and
+  `colorcontrol`; covers `g0112`, `g0113` and `g0116`.
+* `gui-menus` — `menu`, `submenu`, the clipboard and `message$`; covers `g0117`
+  and `g0118`.
+* `gui-bitmaps` — `bitmap`; covers `g0120`.
+
+Each family has its own probe, so a slice turns its tests on by itself and the
+other tests keep skipping with a reason instead of failing for a command that is
+simply not written yet.
 
 The probe is the first thing that touches the backend, so a failing probe used
 to turn every graphical test into a bare `SKIP (requires graphics)` with no
@@ -102,11 +114,13 @@ keywords; the first other token leaves the state and scans normally. The cost is
 small (three rules plus a fallback that re-scans the character) and it keeps
 both dialects working.
 
-**%expect 4.** The yab extensions add four shift/reduce conflicts, and all four
-are resolved the way yab resolves them: a `+` after `window get`/`draw get`
-concatenates the result, and a `,` after `draw get "prop", "text"` continues
-the longer three-string form. The count is asserted, so a future rule that adds
-a conflict makes bison fail instead of silently changing how an existing program
+**%expect 6.** The yab extensions add six shift/reduce conflicts, and all are
+resolved the way yab resolves them: a `+` after `window get`/`draw get`
+concatenates the result, a `,` after `draw get "prop", "text"` continues the
+longer three-string form, and a `+` after `textcontrol get "id"` / `textedit
+get "id"` runs the argument to the `+` (the getter takes the whole string
+expression that follows it). The count is asserted, so a future rule that adds a
+conflict makes bison fail instead of silently changing how an existing program
 parses.
 
 **One handler, one bridge.** All the new statements compile to `cYAB*` opcodes
@@ -126,6 +140,30 @@ only ever blits the frame. That is the round 6 rule again: the window thread
 takes no bitmap lock that the interpreter could be holding. A view keeps its
 own `B_RGB32` bitmap with a `BView`, so its contents survive an expose without
 replaying the primitives.
+
+**Widgets are children of the window's display view.** yab addresses its
+controls by name; the layer keeps a registry (`YabWidget`) and puts each
+`BButton`, `BCheckBox`, `BRadioButton`, `BStringView`, `BTextControl`,
+`BTextView`, `BSlider`, `BStatusBar`, `BBox`, `BTabView` or scrollbar into the
+window as a child of the display view, so app_server draws and operates it. A
+`layout` command sets the resize mode the later widgets get. A command's last
+string names the view the widget belongs to; the window's own root view answers
+to the window's name, which is what yab programs pass, and a named view offsets
+the coordinates.
+
+**Container views own plain views.** `splitview` creates `id1` and `id2`;
+`stackview` creates `id1` … `idN` and shows one at a time; `canvas` and `region`
+are ordinary drawable views. All of them are offscreen surfaces composited into
+the window frame, and `draw flush` now repaints every visible view in creation
+order (white first), so switching a stack page cannot leave the old page's
+pixels behind.
+
+**Two small extensions.** yab has no way to read a widget back, but a text
+control and a text edit are only useful if the program can, so
+`textcontrol get "id"` and `textedit get "id"` are RenkuBASIC string
+functions. And because a yab program selects its font with `draw set`, that
+command also records the specification as yabasic's `fontname`, which is what
+`peek$("font")` reports (`g0103` asserts exactly that).
 
 **Screenshots.** yab's `screenshot` captures the screen. RenkuBASIC captures
 the frontmost yab window's frame instead, so the command works the same when
@@ -148,9 +186,22 @@ like `rk_gui_save_png()`.
   `window set` knows `title` and `flags` (`not-h-resizable`, `not-v-resizable`,
   `not-zoomable`, `not-closable`, `not-movable`, and their positive forms).
   Anything else is a runtime error naming the property, not a silent no-op.
-* **`draw` covers the primitives the GUI tests use.** There is no `draw bitmap`,
-  no canvas or region, no view removal, and no `message$` for widget events;
-  those belong with the widget slice.
+* **`draw` covers the primitives the GUI tests use.** There is no `draw bitmap`
+  and no view removal yet.
+* **Widgets are the controls, not yab's custom classes.** A `boxview` is a
+  `BBox`, so it has no drawable child view of its own; tab pages are empty
+  `BView`s; a split view has two panes with a fixed gap instead of a draggable
+  divider; `scrollbar` attaches bars to the window over the view's edges rather
+  than scrolling its contents; a spin control is a text field with `+`/`-`
+  buttons, because Haiku has no spinner; `textedit` wraps but has no scrollbars
+  yet; and `texturl` keeps its link as a tool tip, since there is no URL
+  handler. `attribute` and `message$` (widget events) are still open.
+* **Only the widget properties the tests need exist.** `option set` knows
+  `label`/`text`, `enabled`, `value` and `tooltip`; `option colour` knows
+  `bgcolor`, `highcolor` and `lowcolor`; a slider knows `barcolor` and
+  `fillcolor` (Haiku's slider has one bar colour, so both set it) and hash
+  marks; a text edit knows `highcolor`, `bgcolor` and `lowcolor`. An unknown
+  property is a runtime error naming it.
 * **Window keyboard input is buffered, not selectable.** `rk_window_pending()`
   reports buffered window keys, but `rk_window_fd()` stays -1 because a BWindow
   has no file descriptor. `inkey$` therefore still waits on the terminal; a
@@ -434,7 +485,55 @@ on app_server, and that `g0100`, `g0101`, `g0103` and `g0119` pass there. The
 four tests open real windows, so if one of them stops, the runner's probe log and
 the failing test's stderr say which call it was inside.
 
-Next slice: `button`, `checkbox`, `radiobutton`, `textcontrol`, `text`,
-`textedit`, `slider`, `statusbar`, `option`/`attribute`; then the list controls
-(`listbox`, `dropbox`, `columnbox`, `treebox`, `calendar`, `colorcontrol`), then
-menus, clipboard, `bitmap`, `canvas`/`region` and `message$`.
+**Round 8 (2026-11-26).** The round-7 run on Haiku built clean and passed
+everything except `g0103`, which failed exactly where predicted: `peek$('font')`
+was empty, because a yab program selects its font with `draw set` and nothing
+told yabasic's `fontname`. `draw set "<spec>"` now records the specification
+(the bridge call lives in `rk_yab_cmd.c`, so the C++ side stays unaware of
+yabasic's globals) and `g0103` gets past that assertion.
+
+This round adds the widget slice: `layout`, `button`, `checkbox`,
+`radiobutton`, `text`, `texturl`, `textcontrol`, `textedit`, `slider`,
+`scrollbar`, `statusbar`, `spincontrol`, `option set`/`option colour`,
+`tooltip`, `tabview`, `boxview`, `splitview`, `stackview`, `canvas` and
+`region`, with their `set`/`add`/`remove`/`clear`/`label`/`colour` forms and the
+two `… get` extensions. Notes:
+
+* The scanner enters `YABKEY` after every widget keyword too, so `set`, `get`,
+  `add` and `remove` are keywords only there. `add` and `remove` are guarded by
+  trailing context (`ADD/[ \t]`), and `set`/`get` got the same guard, so a
+  program can still write `add$`, `set$` or a variable named `add`.
+* `text 10, 10, "id", "label", "window"` is the widget form, exactly as in
+  yab, and it takes the place of yabasic's third `text` form (three strings
+  after the coordinates). That production is gone: for a merged grammar yab's
+  reading has to win.
+* The two `… get` string functions add two conflicts, both about a following
+  `+` (the argument runs to it), so `%expect` is 6.
+* On the C++ side the widgets are one registry: creation commands build the
+  Haiku control and attach it to the window's display view under the window
+  lock, property commands find it by name and change it under the same lock,
+  and a failed call becomes a runtime error naming the widget or the property.
+  Closing a window frees the registry entries; the window deletes the controls.
+* `draw flush` and a stack page switch go through one `refresh_window()`, which
+  paints the frame white and composites every visible view in creation order.
+
+Checked here (Linux, no app_server): the grammar regenerates with the expected
+six conflicts; all C sources plus a stub of both bridges build and link; the CLI
+suite stays at 35 / 0 / 6; `g0102`, `g0110`, `g0111`, `g0114` and `g0115` run
+end to end against the stub, which is what exercises the argument order, the
+keyword states and the `textcontrol get`/`textedit get` round trip; `g0103` now
+passes the `peek$("font")` assertion and fails only on the stub's font-width
+limitation; and `rk_yab.cpp` still passes `g++ -fsyntax-only` against Haiku's
+own public headers. Not checked: anything on app_server. No control was ever
+drawn, so layout, focus, resizing and event handling on Haiku are the next run's
+business.
+
+What the next Haiku run should show: `gui-widgets : available`; `gui-lists`,
+`gui-menus` and `gui-bitmaps` unavailable with their probe explanation; and
+`g0100`, `g0101`, `g0102`, `g0103`, `g0110`, `g0111`, `g0114`, `g0115`, `g0119`,
+`g0130` and `g0131` passing.
+
+Next slice: the list controls (`listbox`, `dropbox`, `columnbox`, `treebox`,
+`calendar`, `colorcontrol`); then menus, clipboard, `bitmap` and `message$`;
+then `attribute`, widget events, and the tab/box/split polish that the gaps list
+names.

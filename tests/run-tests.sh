@@ -14,6 +14,9 @@
 #   // @requires: renkubasic        skip when the interpreter is a plain yabasic
 #   // @requires: gui               skip when no window can be opened
 #   // @requires: gui-widgets       skip until buttons and the other controls work
+#   // @requires: gui-lists         skip until listbox, treebox and calendar work
+#   // @requires: gui-menus         skip until menus and the clipboard work
+#   // @requires: gui-bitmaps       skip until bitmap works
 #   // @requires: pty               skip when script(1) is unavailable
 #   // @requires: ffi               skip when foreign_function_call is missing
 #   // @requires: haiku             skip unless peek$("os") is haiku/renkuos
@@ -244,6 +247,44 @@ if [ "$IS_RENKU" = "1" ] && [ "$GUI_OK" = "1" ]; then
   fi
 fi
 
+# The remaining widget families are later slices again: each probe asks for one
+# representative command, so a family turns available on its own.
+probe_family() {  # requirement probe-file log-file probe-source
+  local probe="$SCRATCH/$2"
+  printf '%s\n' "$4" > "$probe"
+  run_probe "$probe" "$SCRATCH/$3"
+}
+
+LISTS_OK=0
+MENUS_OK=0
+BITMAPS_OK=0
+if [ "$IS_RENKU" = "1" ] && [ "$GUI_OK" = "1" ]; then
+  if probe_family lists lists-probe.yab lists-probe.log 'window open 20, 20 to 190, 120, "rkw", "RenkuBASIC probe"
+listbox 10, 10 to 80, 90, "rklist", 3, "rkw"
+window close "rkw"
+exit 0'; then
+    LISTS_OK=1
+  else
+    probe_note gui-lists "$SCRATCH/lists-probe.log"
+  fi
+  if probe_family menus menus-probe.yab menus-probe.log 'window open 20, 20 to 190, 120, "rkw", "RenkuBASIC probe"
+menu "File", "Quit", "q", "rkw"
+window close "rkw"
+exit 0'; then
+    MENUS_OK=1
+  else
+    probe_note gui-menus "$SCRATCH/menus-probe.log"
+  fi
+  if probe_family bitmaps bitmaps-probe.yab bitmaps-probe.log 'window open 20, 20 to 190, 120, "rkw", "RenkuBASIC probe"
+bitmap 10, 10, "rk-probe.png"
+window close "rkw"
+exit 0'; then
+    BITMAPS_OK=1
+  else
+    probe_note gui-bitmaps "$SCRATCH/bitmaps-probe.log"
+  fi
+fi
+
 # The yabasic graphic window is a separate capability from yab's widget
 # windows: it can exist before the compatibility layer does.
 GRAPHICS_OK=0
@@ -290,6 +331,9 @@ requirement_met() {
     renkubasic) [ "$IS_RENKU" = "1" ] ;;
     gui) [ "$GUI_OK" = "1" ] ;;
     gui-widgets) [ "$WIDGETS_OK" = "1" ] ;;
+    gui-lists) [ "$LISTS_OK" = "1" ] ;;
+    gui-menus) [ "$MENUS_OK" = "1" ] ;;
+    gui-bitmaps) [ "$BITMAPS_OK" = "1" ] ;;
     graphics) [ "$GRAPHICS_OK" = "1" ] ;;
     pty) [ "$HAS_PTY" = "1" ] ;;
     haiku) case "$OSNAME" in haiku|renkuos) return 0 ;; *) return 1 ;; esac ;;
@@ -358,6 +402,9 @@ echo "  os          : $OSNAME"
 echo "  suites      : $SUITE_DIRS"
 echo "  gui         : $([ "$GUI_OK" = "1" ] && echo available || echo unavailable)"
 echo "  gui-widgets : $([ "$WIDGETS_OK" = "1" ] && echo available || echo unavailable)"
+echo "  gui-lists   : $([ "$LISTS_OK" = "1" ] && echo available || echo unavailable)"
+echo "  gui-menus   : $([ "$MENUS_OK" = "1" ] && echo available || echo unavailable)"
+echo "  gui-bitmaps : $([ "$BITMAPS_OK" = "1" ] && echo available || echo unavailable)"
 echo "  graphics    : $([ "$GRAPHICS_OK" = "1" ] && echo available || echo unavailable)"
 echo "  pty         : $([ "$HAS_PTY" = "1" ] && echo available || echo unavailable)"
 echo

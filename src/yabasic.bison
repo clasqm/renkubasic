@@ -160,6 +160,12 @@ void collect_missing_clauses(char *string, char exclude) {
    identified by the cYAB* opcodes and fYAB* function ids. */
 %token tSET tGET tCOUNT tVIEW tDRAW tFLUSH tELLIPSE tARC tPOLYGON tROUNDRECT
 %token tSCREENSHOT tBFILESIZE
+/* yab widget keywords. The scanner enters its YABKEY state after every one of
+   them, so the following command word (set, get, add, remove, ...) is a
+   keyword only there; elsewhere those words stay ordinary identifiers. */
+%token tBUTTON tCHECKBOX tRADIOBUTTON tTEXTCONTROL tTEXTEDIT tTEXTURL
+%token tSLIDER tSTATUSBAR tSPINCONTROL tSCROLLBAR tLAYOUT tTOOLTIP tOPTION
+%token tTABVIEW tBOXVIEW tSPLITVIEW tSTACKVIEW tCANVAS tREGION tADD tREMOVE
 
 %token tSIN tASIN tCOS tACOS tTAN tATAN tEXP tLOG
 %token tSQRT tSQR tMYEOF tABS tSIG
@@ -175,14 +181,18 @@ void collect_missing_clauses(char *string, char exclude) {
 
 %start program_or_expression
 
-/* Four shift/reduce conflicts, all introduced by the yab GUI extensions and
-   all resolved the way yab resolves them:
+/* Six shift/reduce conflicts, all introduced by the yab GUI extensions and all
+   resolved the way yab resolves them:
      window get "w", "p" + "s"   -- shift: '+' concatenates the result
      draw get  "p", "text", "v"  -- shift: a ',' continues the longer form
-   Bison's default (shift) gives exactly those readings, so the count is
-   asserted here: a new conflict makes bison fail instead of silently changing
-   how an existing program parses. */
-%expect 4
+     textcontrol get "id" + "s"  -- shift: the argument runs to the '+'
+     textedit get "id" + "s"     -- shift: the argument runs to the '+'
+   Bison's default (shift) gives exactly those readings: `textcontrol get`
+   takes the whole string expression that follows it, so a concatenation is an
+   argument rather than something added to the result. The count is asserted
+   here, so a new conflict makes bison fail instead of silently changing how an
+   existing program parses. */
+%expect 6
 
 %left tOR
 %left tAND
@@ -300,7 +310,6 @@ statement:  /* empty */
   | clear_fill_clause tTRIANGLE coordinates to coordinates to coordinates {add_command(cTRIANGLE);putindrawmode(0);}
   | tTEXT coordinates ',' string_expression {add_command(cTEXT1);}
   | tTEXT coordinates ',' string_expression ',' string_expression {add_command(cTEXT2);}
-  | tTEXT coordinates ',' string_expression ',' string_expression ',' string_expression {add_command(cTEXT3);}
   | clear_fill_clause tRECT coordinates to coordinates {add_command(cRECT);putindrawmode(0);}
   | tCLOSE tWINDOW {add_command(cCLOSEWIN);}
   | tCLEAR tWINDOW {add_command(cCLEARWIN);}
@@ -328,6 +337,55 @@ statement:  /* empty */
   | tDRAW tPOLYGON coordinates to coordinates to coordinates to coordinates ',' string_expression {add_command(cYABDRAWPOLYGON);}
   | tDRAW tFLUSH string_expression {add_command(cYABDRAWFLUSH);}
   | tSCREENSHOT coordinates to coordinates ',' string_expression {add_command(cYABSCREENSHOT);}
+/* yab widgets. The last string of a creation command names the view the widget
+   lives in; the window's own root view carries the window's name, which is what
+   yab programs pass (the widget tests do the same). */
+  | tLAYOUT string_expression ',' string_expression {add_command(cYABLAYOUT);}
+  | tBUTTON coordinates to coordinates ',' string_expression ',' string_expression ',' string_expression {add_command(cYABBUTTON);}
+  | tCHECKBOX coordinates ',' string_expression ',' string_expression ',' expression ',' string_expression {add_command(cYABCHECKBOX);}
+  | tCHECKBOX tSET string_expression ',' expression {add_command(cYABCHECKBOXSET);}
+  | tRADIOBUTTON coordinates ',' string_expression ',' string_expression ',' expression ',' string_expression {add_command(cYABRADIOBUTTON);}
+  | tRADIOBUTTON tSET string_expression ',' expression {add_command(cYABRADIOSET);}
+  | tTEXT coordinates ',' string_expression ',' string_expression ',' string_expression {add_command(cYABTEXT);}
+  | tTEXT tSET string_expression ',' string_expression {add_command(cYABTEXTALIGN);}
+  | tTEXTURL coordinates ',' string_expression ',' string_expression ',' string_expression ',' string_expression {add_command(cYABTEXTURL);}
+  | tTEXTCONTROL coordinates to coordinates ',' string_expression ',' string_expression ',' string_expression ',' string_expression {add_command(cYABTEXTCONTROL);}
+  | tTEXTCONTROL tSET string_expression ',' string_expression {add_command(cYABTEXTCONTROLSET);}
+  | tTEXTCONTROL tSET string_expression ',' expression {add_command(cYABTEXTCONTROLMASK);}
+  | tTEXTCONTROL tCLEAR string_expression {add_command(cYABTEXTCONTROLCLEAR);}
+  | tTEXTEDIT coordinates to coordinates ',' string_expression ',' expression ',' string_expression {add_command(cYABTEXTEDIT);}
+  | tTEXTEDIT tADD string_expression ',' string_expression {add_command(cYABTEXTEDITADD);}
+  | tTEXTEDIT tSET string_expression ',' string_expression {add_command(cYABTEXTEDITSET);}
+  | tTEXTEDIT tCLEAR string_expression {add_command(cYABTEXTEDITCLEAR);}
+  | tTEXTEDIT tCOLOUR string_expression ',' string_expression ',' expression ',' expression ',' expression {add_command(cYABTEXTEDITCOLOUR);}
+  | tSLIDER coordinates to coordinates ',' string_expression ',' string_expression ',' expression ',' expression ',' string_expression {add_command(cYABSLIDER);}
+  | tSLIDER coordinates to coordinates ',' string_expression ',' string_expression ',' expression ',' expression ',' string_expression ',' string_expression {add_command(cYABSLIDEROPT);}
+  | tSLIDER tLABEL string_expression ',' string_expression ',' string_expression {add_command(cYABSLIDERLABEL);}
+  | tSLIDER tSET string_expression ',' string_expression ',' expression {add_command(cYABSLIDERMARKS);}
+  | tSLIDER tCOLOUR string_expression ',' string_expression ',' expression ',' expression ',' expression {add_command(cYABSLIDERCOLOUR);}
+  | tSLIDER tSET string_expression ',' expression {add_command(cYABSLIDERSET);}
+  | tSCROLLBAR string_expression ',' expression ',' string_expression {add_command(cYABSCROLLBAR);}
+  | tSCROLLBAR tSET string_expression ',' string_expression ',' expression {add_command(cYABSCROLLBARSET);}
+  | tSCROLLBAR tSET string_expression ',' string_expression ',' expression ',' expression {add_command(cYABSCROLLBARRANGE);}
+  | tSTATUSBAR coordinates to coordinates ',' string_expression ',' string_expression ',' string_expression ',' string_expression {add_command(cYABSTATUSBAR);}
+  | tSTATUSBAR tSET string_expression ',' string_expression ',' string_expression ',' expression {add_command(cYABSTATUSBARSET);}
+  | tSPINCONTROL coordinates ',' string_expression ',' string_expression ',' expression ',' expression ',' expression ',' string_expression {add_command(cYABSPINCONTROL);}
+  | tSPINCONTROL tSET string_expression ',' expression {add_command(cYABSPINCONTROLSET);}
+  | tOPTION tSET string_expression ',' string_expression ',' string_expression {add_command(cYABOPTIONTEXT);}
+  | tOPTION tSET string_expression ',' string_expression ',' expression {add_command(cYABOPTIONNUMBER);}
+  | tOPTION tCOLOUR string_expression ',' string_expression ',' expression ',' expression ',' expression {add_command(cYABOPTIONCOLOUR);}
+  | tTOOLTIP string_expression ',' string_expression {add_command(cYABTOOLTIP);}
+  | tTABVIEW coordinates to coordinates ',' string_expression ',' string_expression ',' string_expression {add_command(cYABTABVIEW);}
+  | tTABVIEW tADD string_expression ',' string_expression {add_command(cYABTABADD);}
+  | tTABVIEW tSET string_expression ',' expression {add_command(cYABTABSET);}
+  | tTABVIEW tREMOVE string_expression ',' expression {add_command(cYABTABREMOVE);}
+  | tBOXVIEW coordinates to coordinates ',' string_expression ',' string_expression ',' expression ',' string_expression {add_command(cYABBOXVIEW);}
+  | tBOXVIEW tSET string_expression ',' string_expression ',' string_expression {add_command(cYABBOXVIEWSET);}
+  | tSPLITVIEW coordinates to coordinates ',' string_expression ',' expression ',' expression ',' string_expression {add_command(cYABSPLITVIEW);}
+  | tSTACKVIEW coordinates to coordinates ',' string_expression ',' expression ',' string_expression {add_command(cYABSTACKVIEW);}
+  | tSTACKVIEW tSET string_expression ',' expression {add_command(cYABSTACKVIEWSET);}
+  | tCANVAS coordinates to coordinates ',' string_expression ',' string_expression {add_command(cYABCANVAS);}
+  | tREGION coordinates to coordinates ',' string_expression ',' string_expression {add_command(cYABREGION);}
   | tOPEN tPRINTER {create_openprinter(0);}
   | tOPEN tPRINTER string_expression {create_openprinter(1);}
   | tCLOSE tPRINTER {add_command(cCLOSEPRN);}
@@ -427,6 +485,10 @@ string_function: tLEFT '(' string_expression ',' expression ')' {create_function
   | tTIME {create_function(fTIME);}
   | tTIME '(' ')' {create_function(fTIME);}
   | tPEEK2 '(' string_expression ')' {create_function(fPEEK2);}
+  /* RenkuBASIC extensions: yab has no way to read a widget back, but a text
+     control or a text edit is only useful if the program can. */
+  | tTEXTCONTROL tGET string_expression {create_function(fYABTEXTCONTROLGET);}
+  | tTEXTEDIT tGET string_expression {create_function(fYABTEXTEDITGET);}
   | tPEEK2 '(' string_expression ',' string_expression ')' {create_function(fPEEK3);}
   | tTOKENALT '(' string_scalar_or_array ',' string_expression ')' {add_command(cTOKENALT2);}
   | tTOKENALT '(' string_scalar_or_array ')' {add_command(cTOKENALT);}

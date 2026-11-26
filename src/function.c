@@ -952,6 +952,18 @@ void function(struct command *cmd) /* performs a function */
     rk_yab_check();
     result = stNUMBER;
     break;
+  /* RenkuBASIC extensions. The bridge returns an empty string instead of NULL,
+     so the copy is always safe. */
+  case fYABTEXTCONTROLGET:
+    pointer = my_strdup((char *)rk_yab_textcontrol_get(a1->pointer));
+    rk_yab_check();
+    result = stSTRING;
+    break;
+  case fYABTEXTEDITGET:
+    pointer = my_strdup((char *)rk_yab_textedit_get(a1->pointer));
+    rk_yab_check();
+    result = stSTRING;
+    break;
   case fTELL:
     i = (int)(a1->value);
     if (badstream(i, 0)) {

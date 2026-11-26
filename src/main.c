@@ -1303,6 +1303,52 @@ static void initialize(void)
   cexplanation[cYABDRAWPOLYGON] = "YABDRAWPOLYGON";
   cexplanation[cYABDRAWFLUSH] = "YABDRAWFLUSH";
   cexplanation[cYABSCREENSHOT] = "YABSCREENSHOT";
+  cexplanation[cYABLAYOUT] = "YABLAYOUT";
+  cexplanation[cYABBUTTON] = "YABBUTTON";
+  cexplanation[cYABCHECKBOX] = "YABCHECKBOX";
+  cexplanation[cYABCHECKBOXSET] = "YABCHECKBOXSET";
+  cexplanation[cYABRADIOBUTTON] = "YABRADIOBUTTON";
+  cexplanation[cYABRADIOSET] = "YABRADIOSET";
+  cexplanation[cYABTEXT] = "YABTEXT";
+  cexplanation[cYABTEXTALIGN] = "YABTEXTALIGN";
+  cexplanation[cYABTEXTURL] = "YABTEXTURL";
+  cexplanation[cYABTEXTCONTROL] = "YABTEXTCONTROL";
+  cexplanation[cYABTEXTCONTROLSET] = "YABTEXTCONTROLSET";
+  cexplanation[cYABTEXTCONTROLMASK] = "YABTEXTCONTROLMASK";
+  cexplanation[cYABTEXTCONTROLCLEAR] = "YABTEXTCONTROLCLEAR";
+  cexplanation[cYABTEXTEDIT] = "YABTEXTEDIT";
+  cexplanation[cYABTEXTEDITADD] = "YABTEXTEDITADD";
+  cexplanation[cYABTEXTEDITSET] = "YABTEXTEDITSET";
+  cexplanation[cYABTEXTEDITCLEAR] = "YABTEXTEDITCLEAR";
+  cexplanation[cYABTEXTEDITCOLOUR] = "YABTEXTEDITCOLOUR";
+  cexplanation[cYABSLIDER] = "YABSLIDER";
+  cexplanation[cYABSLIDEROPT] = "YABSLIDEROPT";
+  cexplanation[cYABSLIDERLABEL] = "YABSLIDERLABEL";
+  cexplanation[cYABSLIDERMARKS] = "YABSLIDERMARKS";
+  cexplanation[cYABSLIDERCOLOUR] = "YABSLIDERCOLOUR";
+  cexplanation[cYABSLIDERSET] = "YABSLIDERSET";
+  cexplanation[cYABSCROLLBAR] = "YABSCROLLBAR";
+  cexplanation[cYABSCROLLBARSET] = "YABSCROLLBARSET";
+  cexplanation[cYABSCROLLBARRANGE] = "YABSCROLLBARRANGE";
+  cexplanation[cYABSTATUSBAR] = "YABSTATUSBAR";
+  cexplanation[cYABSTATUSBARSET] = "YABSTATUSBARSET";
+  cexplanation[cYABSPINCONTROL] = "YABSPINCONTROL";
+  cexplanation[cYABSPINCONTROLSET] = "YABSPINCONTROLSET";
+  cexplanation[cYABOPTIONTEXT] = "YABOPTIONTEXT";
+  cexplanation[cYABOPTIONNUMBER] = "YABOPTIONNUMBER";
+  cexplanation[cYABOPTIONCOLOUR] = "YABOPTIONCOLOUR";
+  cexplanation[cYABTOOLTIP] = "YABTOOLTIP";
+  cexplanation[cYABTABVIEW] = "YABTABVIEW";
+  cexplanation[cYABTABADD] = "YABTABADD";
+  cexplanation[cYABTABSET] = "YABTABSET";
+  cexplanation[cYABTABREMOVE] = "YABTABREMOVE";
+  cexplanation[cYABBOXVIEW] = "YABBOXVIEW";
+  cexplanation[cYABBOXVIEWSET] = "YABBOXVIEWSET";
+  cexplanation[cYABSPLITVIEW] = "YABSPLITVIEW";
+  cexplanation[cYABSTACKVIEW] = "YABSTACKVIEW";
+  cexplanation[cYABSTACKVIEWSET] = "YABSTACKVIEWSET";
+  cexplanation[cYABCANVAS] = "YABCANVAS";
+  cexplanation[cYABREGION] = "YABREGION";
   cexplanation[cOPENPRN] = "OPENPRN";
   cexplanation[cCLOSEPRN] = "CLOSEPRN";
   cexplanation[cTESTEOF] = "TESTEOF";
@@ -1436,6 +1482,8 @@ static void initialize(void)
   fexplanation[fYABWINDOWGET] = "YABWINDOWGET";
   fexplanation[fYABDRAWGET] = "YABDRAWGET";
   fexplanation[fYABDRAWGETTEXT] = "YABDRAWGETTEXT";
+  fexplanation[fYABTEXTCONTROLGET] = "YABTEXTCONTROLGET";
+  fexplanation[fYABTEXTEDITGET] = "YABTEXTEDITGET";
   fexplanation[fLAST_FUNCTION] = "LAST_FUNCTION";
   for (i = fFIRST_FUNCTION; i <= fLAST_FUNCTION; i++) {
     if (!fexplanation[i]) {
@@ -1902,6 +1950,52 @@ static void run_it()
       case cYABDRAWPOLYGON:
       case cYABDRAWFLUSH:
       case cYABSCREENSHOT:
+      case cYABLAYOUT:
+      case cYABBUTTON:
+      case cYABCHECKBOX:
+      case cYABCHECKBOXSET:
+      case cYABRADIOBUTTON:
+      case cYABRADIOSET:
+      case cYABTEXT:
+      case cYABTEXTALIGN:
+      case cYABTEXTURL:
+      case cYABTEXTCONTROL:
+      case cYABTEXTCONTROLSET:
+      case cYABTEXTCONTROLMASK:
+      case cYABTEXTCONTROLCLEAR:
+      case cYABTEXTEDIT:
+      case cYABTEXTEDITADD:
+      case cYABTEXTEDITSET:
+      case cYABTEXTEDITCLEAR:
+      case cYABTEXTEDITCOLOUR:
+      case cYABSLIDER:
+      case cYABSLIDEROPT:
+      case cYABSLIDERLABEL:
+      case cYABSLIDERMARKS:
+      case cYABSLIDERCOLOUR:
+      case cYABSLIDERSET:
+      case cYABSCROLLBAR:
+      case cYABSCROLLBARSET:
+      case cYABSCROLLBARRANGE:
+      case cYABSTATUSBAR:
+      case cYABSTATUSBARSET:
+      case cYABSPINCONTROL:
+      case cYABSPINCONTROLSET:
+      case cYABOPTIONTEXT:
+      case cYABOPTIONNUMBER:
+      case cYABOPTIONCOLOUR:
+      case cYABTOOLTIP:
+      case cYABTABVIEW:
+      case cYABTABADD:
+      case cYABTABSET:
+      case cYABTABREMOVE:
+      case cYABBOXVIEW:
+      case cYABBOXVIEWSET:
+      case cYABSPLITVIEW:
+      case cYABSTACKVIEW:
+      case cYABSTACKVIEWSET:
+      case cYABCANVAS:
+      case cYABREGION:
         rk_yab_command(currcmd);
         DONE;
       case cRECT:
