@@ -516,6 +516,11 @@ two `… get` extensions. Notes:
   Closing a window frees the registry entries; the window deletes the controls.
 * `draw flush` and a stack page switch go through one `refresh_window()`, which
   paints the frame white and composites every visible view in creation order.
+* A tab page belongs to its `BTab`: `RemoveTab()` detaches the page and returns
+  the tab without deleting it, and the tab's destructor deletes the page. The
+  first round-8 Haiku run hung in `tabview remove` because the code deleted the
+  page as well; a second free on Haiku reaches `debugger()`, which blocks the
+  thread, so the symptom was a timeout with no output instead of a crash.
 
 Checked here (Linux, no app_server): the grammar regenerates with the expected
 six conflicts; all C sources plus a stub of both bridges build and link; the CLI
@@ -528,10 +533,12 @@ own public headers. Not checked: anything on app_server. No control was ever
 drawn, so layout, focus, resizing and event handling on Haiku are the next run's
 business.
 
-What the next Haiku run should show: `gui-widgets : available`; `gui-lists`,
-`gui-menus` and `gui-bitmaps` unavailable with their probe explanation; and
-`g0100`, `g0101`, `g0102`, `g0103`, `g0110`, `g0111`, `g0114`, `g0115`, `g0119`,
-`g0130` and `g0131` passing.
+The first Haiku run of this slice passed ten tests and timed out on `g0115`
+(views) in `tabview remove`, for the ownership reason above; that fix is the
+only change since. What the rerun should show: `gui-widgets : available`;
+`gui-lists`, `gui-menus` and `gui-bitmaps` unavailable with their probe
+explanation; and `g0100`, `g0101`, `g0102`, `g0103`, `g0110`, `g0111`, `g0114`,
+`g0115`, `g0119`, `g0130` and `g0131` passing.
 
 Next slice: the list controls (`listbox`, `dropbox`, `columnbox`, `treebox`,
 `calendar`, `colorcontrol`); then menus, clipboard, `bitmap` and `message$`;

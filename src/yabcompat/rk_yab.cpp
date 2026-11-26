@@ -2288,11 +2288,12 @@ int rk_yab_tab_remove(const char *id, double index) {
              (int)index);
     return 0;
   }
-  BTab *tab = tabs->TabAt(selected);
-  BView *page = tab ? tab->View() : NULL;
-  tabs->RemoveTab(selected);
+  /* RemoveTab() detaches the page from the container and returns the tab
+     without deleting it; the tab owns the page, so deleting the tab deletes
+     the page. Deleting the page a second time corrupts the heap (on Haiku a
+     double free reaches debugger(), which blocks the process). */
+  BTab *tab = tabs->RemoveTab(selected);
   delete tab;
-  delete page;
   widget->window->window->Unlock();
   return 1;
 }
