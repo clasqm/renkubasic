@@ -8,7 +8,8 @@
 // hung Haiku program leaves no output behind (stdout is block buffered and the
 // runner kills it), so that file is what says where it stopped; the runner
 // prints it when the test times out. One mark per statement, not per group:
-// the last line of the trace has to name the call that does not return.
+// the single line that survives names the call that does not return.
+// (yabasic has no append mode for files, so each mark rewrites the file.)
 //
 // @requires: graphics
 // @timeout: 45

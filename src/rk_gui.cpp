@@ -18,6 +18,12 @@
       blits that bitmap, so getbit$ and screenshots read a stable canvas and
       redraws on expose need no primitive replay. The pixel buffer is also what
       putbit writes into, which keeps those two commands symmetric.
+    * The window thread never touches the canvas. A flush copies the canvas into
+      a second bitmap with no child view (g_frame) and invalidates the view;
+      the view blits that copy. A bitmap with a child view has a looper, and
+      letting the interpreter draw and the window thread blit the same one made
+      both threads share a lock that has no timeout — see round 6 in
+      docs/phase2.md.
     * Text is a BFont. A font specification is "Family, Style, Size"; the parts
       are optional and a missing family falls back to be_plain_font. Bitmap
       fonts are not used anywhere, as Haiku has none.
@@ -44,6 +50,7 @@
 namespace {
 
 BBitmap *g_canvas = NULL;
+BBitmap *g_frame = NULL;
 BView *g_canvas_view = NULL;
 BView *g_display = NULL;
 BWindow *g_window = NULL;
@@ -139,15 +146,14 @@ public:
     trace("display: draw");
     SetHighColor(g_back);
     FillRect(update);
-    if (!g_canvas) {
+    if (!g_frame) {
+      trace("display: nothing to blit");
       return;
     }
-    /* The canvas is written by the interpreter thread; take its lock for the
-       duration of the blit. */
-    if (g_canvas->Lock() == B_OK) {
-      DrawBitmap(g_canvas, BPoint(0, 0));
-      g_canvas->Unlock();
-    }
+    /* g_frame is the snapshot rk_gui_flush() took of the canvas, and it has no
+       child view, so it has no looper: blitting it needs no lock and can never
+       wait for the interpreter thread. */
+    DrawBitmap(g_frame, BPoint(0, 0));
     trace("display: draw done");
   }
 };
@@ -287,6 +293,36 @@ void trim(char *text) {
   }
 }
 
+/* Copy the canvas into the frame the window blits. Only the interpreter thread
+   writes the canvas, and it calls this while it holds the window lock, so the
+   snapshot can never be half written. The window thread then blits a bitmap
+   with no child view, which means it takes no lock at all: the canvas's looper
+   belongs to a window that is never run, and having two threads contend for it
+   (the interpreter drawing, the window thread blitting) is the only place in
+   this backend where a thread could wait without a timeout. */
+void sync_frame(void) {
+  if (!g_canvas || !g_frame || g_width < 1 || g_height < 1) {
+    return;
+  }
+  const uint8 *src = (const uint8 *)g_canvas->Bits();
+  uint8 *dst = (uint8 *)g_frame->Bits();
+  if (!src || !dst) {
+    return;
+  }
+  int32 src_row = g_canvas->BytesPerRow();
+  int32 dst_row = g_frame->BytesPerRow();
+  size_t row_bytes = (size_t)g_width * 4;
+  if (row_bytes > (size_t)src_row) {
+    row_bytes = (size_t)src_row;
+  }
+  if (row_bytes > (size_t)dst_row) {
+    row_bytes = (size_t)dst_row;
+  }
+  for (int y = 0; y < g_height; y++) {
+    memcpy(dst + (size_t)y * dst_row, src + (size_t)y * src_row, row_bytes);
+  }
+}
+
 } // namespace
 
 extern "C" {
@@ -317,6 +353,15 @@ int rk_gui_open_window(int width, int height, const char *title) {
   if (!canvas || canvas->InitCheck() != B_OK) {
     delete canvas;
     set_error("could not create the drawing bitmap");
+    return 0;
+  }
+  /* The frame the window blits. It accepts no views, so its pixels are read
+     and written directly and it has no looper to lock. */
+  BBitmap *frame_bitmap = new BBitmap(canvas_rect, B_RGB32, false);
+  if (!frame_bitmap || frame_bitmap->InitCheck() != B_OK) {
+    delete frame_bitmap;
+    delete canvas;
+    set_error("could not create the display bitmap");
     return 0;
   }
   BView *canvas_view =
@@ -361,13 +406,15 @@ int rk_gui_open_window(int width, int height, const char *title) {
     set_error("could not start the window (is app_server reachable?)");
     /* The window's looper is running but did not answer, and deleting a
        running BLooper is a debugger() call, so it is left to the process
-       exit. The canvas can go: the display view reads g_canvas, which is
+       exit. The canvas can go: the display view reads g_frame, which is
        still NULL, and the canvas owns its own view. */
+    delete frame_bitmap;
     delete canvas;
     return 0;
   }
 
   g_canvas = canvas;
+  g_frame = frame_bitmap;
   g_canvas_view = canvas_view;
   g_display = display;
   g_window = window;
@@ -378,16 +425,19 @@ int rk_gui_open_window(int width, int height, const char *title) {
   g_canvas->Lock();
   g_canvas_view->SetFont(&g_font);
   g_canvas->Unlock();
+  sync_frame();
   trace("open: done");
   return 1;
 }
 
 void rk_gui_close_window(void) {
   BBitmap *canvas = g_canvas;
+  BBitmap *frame_bitmap = g_frame;
   BView *canvas_view = g_canvas_view;
   BWindow *window = g_window;
 
   g_canvas = NULL;
+  g_frame = NULL;
   g_canvas_view = NULL;
   g_display = NULL;
   g_window = NULL;
@@ -410,6 +460,7 @@ void rk_gui_close_window(void) {
       return;
     }
   }
+  delete frame_bitmap;
   if (canvas) {
     canvas->Lock();
     if (canvas_view) {
@@ -432,10 +483,12 @@ void rk_gui_clear(void) {
   if (!g_canvas || !g_canvas_view) {
     return;
   }
-  trace("clear");
+  trace("clear: locking canvas");
   g_canvas->Lock();
+  trace("clear: canvas locked");
   g_canvas_view->SetHighColor(g_back);
   g_canvas_view->FillRect(g_canvas_view->Bounds());
+  trace("clear: filled");
   g_canvas->Unlock();
   rk_gui_flush();
 }
@@ -444,12 +497,18 @@ void rk_gui_flush(void) {
   if (!g_window || !g_display) {
     return;
   }
-  trace("flush");
+  trace("flush: locking window");
   if (g_window->LockWithTimeout(100000) == B_OK) {
-    /* BWindow has no Invalidate(); the canvas view marks itself dirty and the
-       window thread redraws it from the bitmap. */
+    trace("flush: window locked");
+    sync_frame();
+    trace("flush: frame copied");
+    /* BWindow has no Invalidate(); the view marks itself dirty and the window
+       thread redraws it from the frame just copied. */
     g_display->Invalidate();
     g_window->Unlock();
+    trace("flush: done");
+  } else {
+    trace("flush: window busy, skipped");
   }
 }
 

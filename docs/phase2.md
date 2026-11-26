@@ -242,3 +242,53 @@ statement, at one particular primitive, or after `close window`. The three
 candidates are a Haiku `debugger()` trap (the team is suspended, which looks
 exactly like this), a block in the window thread's redraw, and something in
 `getbit$`/`putbit`, whose per-pixel bridge calls are the only loops here.
+
+**Round 6 (2026-11-26, fourth run on Haiku).** The instrumentation from round 5
+answered the question it was added for. `g0130` still times out, but now the
+last backend steps and the statement trace agree:
+
+```
+rk_gui: open: done
+rk_gui: clear          <- clearwin() at the end of openwin()
+rk_gui: flush
+rk_gui: display: draw
+rk_gui: display: draw done
+rk_gui: clear          <- the test's own `clear window`
+rk_gui: display: draw
+rk_gui: display: draw done
+rk_gui: display: draw
+rk_gui: display: draw done
+g0130-trace.txt: clear window
+```
+
+The statement that does not return is `clear window`, and inside it the stall is
+between the `clear` marker and the `flush` marker that `rk_gui_clear()` calls
+next, while the window thread kept completing blits. In other words the
+interpreter is waiting for something the window thread takes and releases — the
+canvas bitmap's lock, which was the only lock in the backend without a timeout:
+`rk_gui_clear()` and every primitive held it, and `RkDisplayView::Draw()` held it
+across `DrawBitmap()`.
+
+So the window thread no longer touches the canvas at all. `rk_gui_flush()` —
+which runs on the interpreter thread, while it holds the window lock — copies
+the canvas into `g_frame`, a second `BBitmap` created **without**
+`B_BITMAP_ACCEPTS_VIEWS`, and invalidates the display view. `Draw()` blits
+`g_frame`, which has no child view and therefore no looper, so the blit takes no
+lock and can never wait for the interpreter. The snapshot is taken under the
+window lock, so the window thread cannot see a half-written frame either. One
+writer, one reader, one lock, and that lock is the window's, which every call
+already takes with `LockWithTimeout()`.
+
+`rk_gui_clear()` and `rk_gui_flush()` are also split into finer trace steps
+(`clear: locking canvas`, `clear: canvas locked`, `clear: filled`,
+`flush: locking window`, `flush: frame copied`, `flush: done`), so the next
+run says whether the stall is now in the canvas lock, in the drawing call
+itself, or gone.
+
+Two things this round deliberately does not know yet: whether the canvas lock
+was really the blocker (Haiku renders drawing into a views-bitmap through
+app_server, so a stall could also be in that round trip rather than the lock),
+and whether the snapshot blit is cheap enough — `g_frame` has no server-side
+copy, so app_server may take the pixels again on the first blit of each frame.
+Both are visible in the next run: the trace either reaches `flush: done` or it
+does not, and the suite's timing shows whether the copy costs anything.
