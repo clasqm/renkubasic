@@ -9,7 +9,7 @@ window. The yab widget layer (`src/yabcompat/`) is the next slice.
 | Piece | Where | State |
 | --- | --- | --- |
 | C bridge between the C core and the Haiku kits | `src/rk_gui.h` | done |
-| `BApplication`, `BWindow`, `BView`, `BBitmap` backend | `src/rk_gui.cpp` | compiles on Haiku; the open/close probe passed once (round 3), drawing not yet confirmed |
+| `BApplication`, `BWindow`, `BView`, `BBitmap` backend | `src/rk_gui.cpp` | compiles on Haiku; the open/close probe passes (round 5); drawing not yet confirmed, `g0130` still times out |
 | yabasic drawing commands on that bridge | `src/rk_graphics.c` | ported from 2.92.1 |
 | TrueType/OpenType font selection | `rk_gui_set_font()` | done |
 | `getbit$` / `putbit` | `rk_graphics.c` | ported, same `rgb W,H:` string format |
@@ -203,3 +203,42 @@ What the next run has to confirm: that the probe passes on repeated runs rather
 than sometimes, and that `g0130` gets past `open window`. Its trace file
 `tests/.scratch/run/g0130-yabasic-graphics/g0130-trace.txt` will then name the
 next statement that does not return, if there is one.
+
+**Round 5 (2026-11-26, third run on Haiku).** The build is unchanged and clean,
+the CLI suite stays at 39 passed / 0 failed / 2 skipped, and the graphics probe
+now comes back: the runner prints `graphics : available` and the window tests
+really run. That closes round 4's open question — constructing the
+`BApplication` on the thread that calls `Run()` was the fix, and `open window` /
+`close window` complete on repeated runs instead of racing.
+
+The gui probe still fails, and this time the reason is not a backend fault:
+`window open 20, 20 to 90, 90, ...` is yab syntax and `src/yabcompat/` has not
+been written yet, so the probe reports a syntax error and the fifteen widget
+tests skip with `(requires gui)`. That note in every run's output is the
+expected state of the phase, not a defect.
+
+`g0131-yabasic-printer` passes: the PostScript header, the primitives as
+`DO`/`LI`/`RE`/`CI`/`TRI`/`AT` operators and the page break all reach
+`rk-print.ps`, and the test reads the file back with plain yabasic.
+
+`g0130-yabasic-graphics` still times out, now with no captured stdout or stderr
+at all, so it stops somewhere after `open window`. Because the failure left
+nothing to read, this round is diagnosis only — no behaviour changed:
+
+* `g0130` marks **every statement** instead of every group, so the last line of
+  `g0130-trace.txt` names the call that does not return, not just the block.
+* The runner prints any `*.txt`/`*.log` file a test left in its run directory
+  when the test times out or fails, so that trace file arrives with the test
+  output instead of needing a separate look in `tests/.scratch`.
+* The runner sets `RK_GUI_TRACE=1` for tests that require `gui` or `graphics`
+  (unless the test inspects stderr), and the backend now traces every primitive
+  plus both halves of the display view's `Draw()`. A killed test's stderr is
+  flushed line by line, so its last line names the backend call that was
+  entered and never returned — which separates "stuck in the interpreter" from
+  "stuck inside the window thread".
+
+What the next run has to settle: whether the trace stops before a drawing
+statement, at one particular primitive, or after `close window`. The three
+candidates are a Haiku `debugger()` trap (the team is suspended, which looks
+exactly like this), a block in the window thread's redraw, and something in
+`getbit$`/`putbit`, whose per-pixel bridge calls are the only loops here.

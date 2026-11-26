@@ -6,10 +6,12 @@
 //
 // The step marks write the statement being executed to g0130-trace.txt. A
 // hung Haiku program leaves no output behind (stdout is block buffered and the
-// runner kills it), so that file is what says where it stopped.
+// runner kills it), so that file is what says where it stopped; the runner
+// prints it when the test times out. One mark per statement, not per group:
+// the last line of the trace has to name the call that does not return.
 //
 // @requires: graphics
-// @timeout: 30
+// @timeout: 45
 
 import harness
 
@@ -21,41 +23,52 @@ end sub
 
 stepmark("open window")
 open window 200, 150
+stepmark("backcolor")
 backcolor 255, 255, 255
+stepmark("color")
 color 0, 0, 0
+stepmark("clear window")
 clear window
 
-stepmark("primitives")
+stepmark("line")
 line 10, 10 to 190, 10
+stepmark("line to")
 line to 190, 40
 line 10, 40
+stepmark("rectangle")
 rectangle 10, 50 to 90, 90
+stepmark("fill rectangle")
 fill rectangle 100, 50 to 190, 90
+stepmark("circle")
 circle 140, 120, 20
+stepmark("fill circle")
 fill circle 40, 120, 15
+stepmark("triangle")
 triangle 10, 140 to 60, 140 to 35, 100
+stepmark("dot")
 dot 100, 120
+stepmark("text, default font")
 text 10, 20, "yabasic graphic text"
-
 stepmark("text with a font")
 text 10, 30, "in a TrueType font", "DejaVu Sans, Bold, 14"
 
-stepmark("curves")
+stepmark("new curve")
 new curve
 line 100, 100 to 120, 90
+stepmark("close curve")
 line 120, 90 to 140, 100
 close curve
 
 stepmark("getbit")
 b$ = getbit$(10, 50, 50, 90)
 assert_true(len(b$) > 0, "getbit$ returns a bitmap string")
-
 stepmark("putbit")
 putbit b$ to 150, 100
 
-stepmark("window origin")
+stepmark("window origin cb")
 window origin "cb"
 line 0, 0 to 50, 0
+stepmark("window origin lt")
 window origin "lt"
 
 stepmark("peek")

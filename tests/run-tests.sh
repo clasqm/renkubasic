@@ -288,6 +288,26 @@ show_output() {
   fi
 }
 
+# A test that is killed leaves its trace file behind as the only record of how
+# far it got: stdout and stderr of a killed interpreter are block buffered and
+# lost. Print the small text files a test wrote to its run directory, so a
+# timeout names the last statement that ran instead of reporting nothing.
+show_rundir_files() {  # rundir
+  local dir="$1" f base
+  [ -d "$dir" ] || return 0
+  for f in "$dir"/*; do
+    [ -f "$f" ] || continue
+    base=$(basename "$f")
+    case "$base" in
+      *.txt|*.log) : ;;
+      *) continue ;;
+    esac
+    [ -s "$f" ] || continue
+    echo "    --- $base ---"
+    head -c 4096 "$f" | sed 's/^/    /'
+  done
+}
+
 PASS=0
 FAIL=0
 SKIP=0
@@ -385,26 +405,34 @@ for f in "${FILES[@]}"; do
   : > "$out"
   : > "$err"
 
-  case "$f" in
-    *.sh)
-      if [ -n "$stdin_file" ]; then
-        ( cd "$rundir" && exec /bin/bash "$f" ) \
-          <"$stdin_file" >"$out" 2>"$err" &
-      else
-        ( cd "$rundir" && exec /bin/bash "$f" ) \
-          </dev/null >"$out" 2>"$err" &
-      fi
-      ;;
-    *)
-      if [ -n "$stdin_file" ]; then
-        ( cd "$rundir" && exec "$INTERP" --librarypath "$LIBDIR" "$f" ) \
-          <"$stdin_file" >"$out" 2>"$err" &
-      else
-        ( cd "$rundir" && exec "$INTERP" --librarypath "$LIBDIR" "$f" ) \
-          </dev/null >"$out" 2>"$err" &
-      fi
-      ;;
+  # The GUI backend writes a flushed step trace to stderr when RK_GUI_TRACE is
+  # set, so a killed test whose output was still buffered still says which
+  # backend call it entered last. Only for the suites that use the window:
+  # other tests may compare stderr or require it to be empty.
+  trace_backend=0
+  case ",$(printf '%s' "$requires" | tr -d ' ')," in
+    *",gui,"*|*",graphics,"*) trace_backend=1 ;;
   esac
+  if [ -n "$(directive "$f" expect-stderr-contains)" ] \
+     || [ "$(directive "$f" expect-empty-output)" = "1" ]; then
+    trace_backend=0
+  fi
+
+  case "$f" in
+    *.sh) runcmd=(/bin/bash "$f") ;;
+    *) runcmd=("$INTERP" --librarypath "$LIBDIR" "$f") ;;
+  esac
+  if [ "$trace_backend" = "1" ]; then
+    runcmd=(env RK_GUI_TRACE=1 "${runcmd[@]}")
+  fi
+
+  if [ -n "$stdin_file" ]; then
+    ( cd "$rundir" && exec "${runcmd[@]}" ) \
+      <"$stdin_file" >"$out" 2>"$err" &
+  else
+    ( cd "$rundir" && exec "${runcmd[@]}" ) \
+      </dev/null >"$out" 2>"$err" &
+  fi
   pid=$!
 
   ( sleep "$tmo"; kill -9 "$pid" 2>/dev/null ) >/dev/null 2>&1 &
@@ -420,6 +448,7 @@ for f in "${FILES[@]}"; do
   if [ "$status" = "137" ] || [ "$status" = "149" ]; then
     echo "FAIL  $name  (timeout after ${tmo}s)"
     show_output "$out" "$err" 15
+    show_rundir_files "$rundir"
     FAIL=$((FAIL + 1))
     TIMEOUT=$((TIMEOUT + 1))
     FAILED_NAMES="$FAILED_NAMES $name"
@@ -465,6 +494,7 @@ for f in "${FILES[@]}"; do
     if [ "$content_ok" != "1" ] && [ "$status" = "$expect_exit" ]; then
       echo "FAIL  $name  ($content_why)"
       show_output "$out" "$err" 20
+      show_rundir_files "$rundir"
       FAIL=$((FAIL + 1))
       FAILED_NAMES="$FAILED_NAMES $name"
       [ "$STOP" = "1" ] && break
@@ -476,6 +506,7 @@ for f in "${FILES[@]}"; do
       echo "FAIL  $name  (exit $status, expected $expect_exit)"
     fi
     show_output "$out" "$err" 20
+    show_rundir_files "$rundir"
     FAIL=$((FAIL + 1))
     FAILED_NAMES="$FAILED_NAMES $name"
     [ "$STOP" = "1" ] && break
