@@ -2,7 +2,7 @@
 // Derived from: the clipboard commands of the yab grammar
 //               (clipboard copy / clipboard paste).
 
-// @requires: gui
+// @requires: gui-widgets
 // @timeout: 20
 
 import harness

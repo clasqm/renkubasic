@@ -39,6 +39,8 @@ set(RK_SOURCES
   src/rk_platform.c
   src/rk_graphics.c
   src/rk_gui.cpp
+  src/yabcompat/rk_yab_cmd.c
+  src/yabcompat/rk_yab.cpp
 )
 
 add_executable(renkubasic ${RK_SOURCES})
@@ -85,6 +87,20 @@ target_link_libraries(renkubasic PRIVATE ${CURSES_LIBRARIES} m
 # shows the inherited language.
 install(TARGETS renkubasic RUNTIME DESTINATION bin)
 install(FILES yabasic/yabasic-2.92.1/yabasic.1 DESTINATION share/man/man1)
+
+# The parser (src/bison.c, src/bison.h, src/flex.c) is checked in, so a normal
+# build needs neither bison nor flex. After editing src/yabasic.bison or
+# src/yabasic.flex, run `make parser` to regenerate all three; it writes into
+# the source tree on purpose, because that is what gets committed.
+add_custom_target(parser
+  COMMAND bison -d -l -t -v --output-file ${CMAKE_CURRENT_SOURCE_DIR}/src/bison.c
+          ${CMAKE_CURRENT_SOURCE_DIR}/src/yabasic.bison
+  COMMAND sh -c "flex -i -I -L -s -d -t ${CMAKE_CURRENT_SOURCE_DIR}/src/yabasic.flex > ${CMAKE_CURRENT_SOURCE_DIR}/src/flex.c"
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/yabasic.bison
+          ${CMAKE_CURRENT_SOURCE_DIR}/src/yabasic.flex
+  COMMENT "Regenerating src/bison.c, src/bison.h and src/flex.c"
+  VERBATIM
+)
 
 enable_testing()
 add_test(NAME cli-suite

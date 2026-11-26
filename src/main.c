@@ -16,6 +16,7 @@
 #ifndef YABASIC_INCLUDED
 #include "yabasic.h"
 #include "rk_gui.h" /* Haiku graphic window bridge */
+#include "yabcompat/rk_yab_runtime.h" /* yab GUI commands */
 #endif
 #include "bison.h"
 #include "rk_platform.h"
@@ -1283,6 +1284,25 @@ static void initialize(void)
   cexplanation[cTEXT3] = "TEXT3";
   cexplanation[cCLOSEWIN] = "CLOSEWIN";
   cexplanation[cCLEARWIN] = "CLEARWIN";
+  cexplanation[cYABOPENWIN] = "YABOPENWIN";
+  cexplanation[cYABCLOSEWIN] = "YABCLOSEWIN";
+  cexplanation[cYABWINSET] = "YABWINSET";
+  cexplanation[cYABVIEW] = "YABVIEW";
+  cexplanation[cYABDRAWSETTEXT] = "YABDRAWSETTEXT";
+  cexplanation[cYABDRAWSETCOLOUR] = "YABDRAWSETCOLOUR";
+  cexplanation[cYABDRAWTEXT] = "YABDRAWTEXT";
+  cexplanation[cYABDRAWDOT] = "YABDRAWDOT";
+  cexplanation[cYABDRAWLINE] = "YABDRAWLINE";
+  cexplanation[cYABDRAWRECT] = "YABDRAWRECT";
+  cexplanation[cYABDRAWROUNDRECT] = "YABDRAWROUNDRECT";
+  cexplanation[cYABDRAWCIRCLE] = "YABDRAWCIRCLE";
+  cexplanation[cYABDRAWELLIPSE] = "YABDRAWELLIPSE";
+  cexplanation[cYABDRAWARC] = "YABDRAWARC";
+  cexplanation[cYABDRAWCURVE] = "YABDRAWCURVE";
+  cexplanation[cYABDRAWTRIANGLE] = "YABDRAWTRIANGLE";
+  cexplanation[cYABDRAWPOLYGON] = "YABDRAWPOLYGON";
+  cexplanation[cYABDRAWFLUSH] = "YABDRAWFLUSH";
+  cexplanation[cYABSCREENSHOT] = "YABSCREENSHOT";
   cexplanation[cOPENPRN] = "OPENPRN";
   cexplanation[cCLOSEPRN] = "CLOSEPRN";
   cexplanation[cTESTEOF] = "TESTEOF";
@@ -1411,6 +1431,11 @@ static void initialize(void)
   fexplanation[fTHREEARGS] = "THREEARGS";
   fexplanation[fGETBIT] = "GETBIT";
   fexplanation[fGETCHAR] = "GETCHAR";
+  fexplanation[fYABNUMWINDOWS] = "YABNUMWINDOWS";
+  fexplanation[fYABBFILESIZE] = "YABBFILESIZE";
+  fexplanation[fYABWINDOWGET] = "YABWINDOWGET";
+  fexplanation[fYABDRAWGET] = "YABDRAWGET";
+  fexplanation[fYABDRAWGETTEXT] = "YABDRAWGETTEXT";
   fexplanation[fLAST_FUNCTION] = "LAST_FUNCTION";
   for (i = fFIRST_FUNCTION; i <= fLAST_FUNCTION; i++) {
     if (!fexplanation[i]) {
@@ -1855,6 +1880,29 @@ static void run_it()
         DONE;
       case cCLEARWIN:
         clearwin();
+        DONE;
+      /* The yab GUI commands share one handler: it pops its own arguments and
+         reports failures as runtime errors (src/yabcompat/rk_yab_cmd.c). */
+      case cYABOPENWIN:
+      case cYABCLOSEWIN:
+      case cYABWINSET:
+      case cYABVIEW:
+      case cYABDRAWSETTEXT:
+      case cYABDRAWSETCOLOUR:
+      case cYABDRAWTEXT:
+      case cYABDRAWDOT:
+      case cYABDRAWLINE:
+      case cYABDRAWRECT:
+      case cYABDRAWROUNDRECT:
+      case cYABDRAWCIRCLE:
+      case cYABDRAWELLIPSE:
+      case cYABDRAWARC:
+      case cYABDRAWCURVE:
+      case cYABDRAWTRIANGLE:
+      case cYABDRAWPOLYGON:
+      case cYABDRAWFLUSH:
+      case cYABSCREENSHOT:
+        rk_yab_command(currcmd);
         DONE;
       case cRECT:
         rect(currcmd);

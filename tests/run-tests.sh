@@ -13,6 +13,7 @@
 # A test may declare its needs in its first 40 lines:
 #   // @requires: renkubasic        skip when the interpreter is a plain yabasic
 #   // @requires: gui               skip when no window can be opened
+#   // @requires: gui-widgets       skip until buttons and the other controls work
 #   // @requires: pty               skip when script(1) is unavailable
 #   // @requires: ffi               skip when foreign_function_call is missing
 #   // @requires: haiku             skip unless peek$("os") is haiku/renkuos
@@ -221,6 +222,28 @@ else
   GUI_OK=0
 fi
 
+# The widget layer (buttons, lists, menus, ...) is a later slice than windows,
+# views and drawing, so it gets its own capability. Tests that need a widget
+# ask for gui-widgets and keep skipping until the probe can create one.
+WIDGETS_OK=0
+probe_widgets() {
+  local probe="$SCRATCH/widgets-probe.yab"
+  cat > "$probe" <<'PROBE'
+window open 20, 20 to 190, 120, "rkw", "RenkuBASIC probe"
+button 10, 10 to 80, 34, "rkok", "OK", "rkw"
+window close "rkw"
+exit 0
+PROBE
+  run_probe "$probe" "$SCRATCH/widgets-probe.log"
+}
+if [ "$IS_RENKU" = "1" ] && [ "$GUI_OK" = "1" ]; then
+  if probe_widgets; then
+    WIDGETS_OK=1
+  else
+    probe_note gui-widgets "$SCRATCH/widgets-probe.log"
+  fi
+fi
+
 # The yabasic graphic window is a separate capability from yab's widget
 # windows: it can exist before the compatibility layer does.
 GRAPHICS_OK=0
@@ -266,6 +289,7 @@ requirement_met() {
   case "$1" in
     renkubasic) [ "$IS_RENKU" = "1" ] ;;
     gui) [ "$GUI_OK" = "1" ] ;;
+    gui-widgets) [ "$WIDGETS_OK" = "1" ] ;;
     graphics) [ "$GRAPHICS_OK" = "1" ] ;;
     pty) [ "$HAS_PTY" = "1" ] ;;
     haiku) case "$OSNAME" in haiku|renkuos) return 0 ;; *) return 1 ;; esac ;;
@@ -333,6 +357,7 @@ echo "  interpreter : $INTERP"
 echo "  os          : $OSNAME"
 echo "  suites      : $SUITE_DIRS"
 echo "  gui         : $([ "$GUI_OK" = "1" ] && echo available || echo unavailable)"
+echo "  gui-widgets : $([ "$WIDGETS_OK" = "1" ] && echo available || echo unavailable)"
 echo "  graphics    : $([ "$GRAPHICS_OK" = "1" ] && echo available || echo unavailable)"
 echo "  pty         : $([ "$HAS_PTY" = "1" ] && echo available || echo unavailable)"
 echo

@@ -2,7 +2,7 @@
 // Derived from: yab 1.8.3 Examples/SliderWorld.yab, AllInOne.yab and
 //               EvenMoreControls.yab.
 
-// @requires: gui
+// @requires: gui-widgets
 // @timeout: 20
 
 import harness

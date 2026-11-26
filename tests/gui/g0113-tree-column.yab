@@ -1,7 +1,7 @@
 // RenkuBASIC GUI test: tree boxes and column (file) boxes
 // Derived from: yab 1.8.3 Examples/AllInOne.yab, TreeDemo.yab and Filebox.yab.
 
-// @requires: gui
+// @requires: gui-widgets
 // @timeout: 20
 
 import harness

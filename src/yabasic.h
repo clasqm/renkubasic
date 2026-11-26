@@ -288,6 +288,7 @@ enum functions {
     fRAN2, fDATE, fTIME,
     fFRNFN_CALL, fFRNFN_CALL2, fFRNBF_ALLOC, fFRNBF_DUMP, fFRNBF_DUMP2,
     fFRNBF_GET_NUMBER, fFRNBF_GET_STRING, fFRNBF_GET_BUFFER, fFRNFN_SIZE, fFRNBF_SIZE,
+    fYABNUMWINDOWS,
     fZEROARGS,
     fINKEY, fMOUSEX, fMOUSEY, fMOUSEB, fMOUSEMOD,
     fSIN, fASIN, fCOS, fACOS, fTAN,
@@ -295,12 +296,12 @@ enum functions {
     fSTR, fSTR4,
     fSQRT, fSQR, fFRAC, fROUND, fABS, fSIG, fRAN, fINT, fCEIL, fFLOOR, fVAL, fASC, fHEX, fBIN, fDEC,
     fUPPER, fLOWER, fCHOMP, 
-    fLTRIM, fRTRIM, fTRIM, fCHR, fBITNOT,
-    fONEARGS, fDEC2, fATAN2, fLEFT, fAND, fOR,
+    fLTRIM, fRTRIM, fTRIM, fCHR, fBITNOT, fYABBFILESIZE,
+    fONEARGS, fDEC2, fATAN2, fLEFT, fAND, fOR, fYABWINDOWGET, fYABDRAWGET,
     fEOR, fSHL, fSHR, fLOG2,
     fRIGHT, fINSTR, fRINSTR, fSTR2, fMOD, fMIN, fMAX, fPEEK3, fMID2, fSTRING,
     fTWOARGS,
-    fMID, fINSTR2, fRINSTR2, fSTR3, fREPLACE,
+    fMID, fINSTR2, fRINSTR2, fSTR3, fREPLACE, fYABDRAWGETTEXT,
     fTHREEARGS,
     fGETBIT, fGETCHAR,
     fLAST_FUNCTION,		/* no function, just marks end of list */
@@ -368,7 +369,15 @@ enum cmd_type {
 
     cFRNBF_SET_NUMBER, cFRNBF_SET_STRING, cFRNBF_FREE,    /* foreign libraries */
     cFRNBF_SET_BUFFER,
-    
+
+    /* yab GUI commands; implemented in src/yabcompat and dispatched together
+       through rk_yab_command(). Arguments are popped in reverse order. */
+    cYABOPENWIN, cYABCLOSEWIN, cYABWINSET, cYABVIEW,
+    cYABDRAWSETTEXT, cYABDRAWSETCOLOUR, cYABDRAWTEXT, cYABDRAWDOT,
+    cYABDRAWLINE, cYABDRAWRECT, cYABDRAWROUNDRECT, cYABDRAWCIRCLE,
+    cYABDRAWELLIPSE, cYABDRAWARC, cYABDRAWCURVE, cYABDRAWTRIANGLE,
+    cYABDRAWPOLYGON, cYABDRAWFLUSH, cYABSCREENSHOT,
+
     cLAST_COMMAND			/* no command, just marks end of list */
 };
 

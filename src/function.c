@@ -16,6 +16,8 @@
 #ifndef YABASIC_INCLUDED
 #include "yabasic.h" /* all prototypes and structures */
 #endif
+#include "yabcompat/rk_yab.h"         /* yab GUI bridge */
+#include "yabcompat/rk_yab_runtime.h" /* error handling for the yab getters */
 #ifndef UINT64_MAX
 #include <stdint.h>
 #endif
@@ -922,6 +924,33 @@ void function(struct command *cmd) /* performs a function */
     pointer = getchars((int)a1->value, (int)a2->value, (int)a3->value,
                        (int)a4->value);
     result = stSTRING;
+    break;
+  /* yab GUI getters. A missing window or an unknown property is a runtime
+     error, reported by the bridge's own message. */
+  case fYABNUMWINDOWS:
+    value = (double)rk_yab_window_count();
+    result = stNUMBER;
+    break;
+  case fYABBFILESIZE:
+    value = rk_yab_file_size(a1->pointer);
+    rk_yab_check();
+    result = stNUMBER;
+    break;
+  case fYABWINDOWGET:
+    value = rk_yab_window_get(a1->pointer, a2->pointer);
+    rk_yab_check();
+    result = stNUMBER;
+    break;
+  case fYABDRAWGET:
+    value = rk_yab_view_get(a1->pointer, a2->pointer);
+    rk_yab_check();
+    result = stNUMBER;
+    break;
+  case fYABDRAWGETTEXT:
+    /* draw get "text-width", <text>, <view> */
+    value = rk_yab_view_text_width(a2->pointer, a3->pointer);
+    rk_yab_check();
+    result = stNUMBER;
     break;
   case fTELL:
     i = (int)(a1->value);

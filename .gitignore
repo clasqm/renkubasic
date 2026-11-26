@@ -4,3 +4,5 @@
 # test scratch output
 tests/.scratch/
 build/
+.tools/
+src/bison.output

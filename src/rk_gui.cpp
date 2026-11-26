@@ -329,6 +329,8 @@ extern "C" {
 
 int rk_gui_available(void) { return 1; }
 
+int rk_gui_ensure_app(void) { return ensure_app() ? 1 : 0; }
+
 const char *rk_gui_last_error(void) { return g_error; }
 
 int rk_gui_window_open(void) { return g_window != NULL; }

@@ -35,8 +35,8 @@
    especially those whose name start with YY_ or yy_.  They are
    private implementation details that can be changed or removed.  */
 
-#ifndef YY_YY_BISON_H_INCLUDED
-# define YY_YY_BISON_H_INCLUDED
+#ifndef YY_YY_SRC_BISON_H_INCLUDED
+# define YY_YY_SRC_BISON_H_INCLUDED
 /* Debug traces.  */
 #ifndef YYDEBUG
 # define YYDEBUG 1
@@ -162,86 +162,98 @@ extern int yydebug;
     tPUTCHAR = 363,                /* tPUTCHAR  */
     tNEW = 364,                    /* tNEW  */
     tCURVE = 365,                  /* tCURVE  */
-    tSIN = 366,                    /* tSIN  */
-    tASIN = 367,                   /* tASIN  */
-    tCOS = 368,                    /* tCOS  */
-    tACOS = 369,                   /* tACOS  */
-    tTAN = 370,                    /* tTAN  */
-    tATAN = 371,                   /* tATAN  */
-    tEXP = 372,                    /* tEXP  */
-    tLOG = 373,                    /* tLOG  */
-    tSQRT = 374,                   /* tSQRT  */
-    tSQR = 375,                    /* tSQR  */
-    tMYEOF = 376,                  /* tMYEOF  */
-    tABS = 377,                    /* tABS  */
-    tSIG = 378,                    /* tSIG  */
-    tINT = 379,                    /* tINT  */
-    tCEIL = 380,                   /* tCEIL  */
-    tFLOOR = 381,                  /* tFLOOR  */
-    tFRAC = 382,                   /* tFRAC  */
-    tROUND = 383,                  /* tROUND  */
-    tMOD = 384,                    /* tMOD  */
-    tRAN = 385,                    /* tRAN  */
-    tVAL = 386,                    /* tVAL  */
-    tLEFT = 387,                   /* tLEFT  */
-    tRIGHT = 388,                  /* tRIGHT  */
-    tMID = 389,                    /* tMID  */
-    tLEN = 390,                    /* tLEN  */
-    tMIN = 391,                    /* tMIN  */
-    tMAX = 392,                    /* tMAX  */
-    tSTR = 393,                    /* tSTR  */
-    tINKEY = 394,                  /* tINKEY  */
-    tCHR = 395,                    /* tCHR  */
-    tASC = 396,                    /* tASC  */
-    tHEX = 397,                    /* tHEX  */
-    tDEC = 398,                    /* tDEC  */
-    tBIN = 399,                    /* tBIN  */
-    tUPPER = 400,                  /* tUPPER  */
-    tLOWER = 401,                  /* tLOWER  */
-    tMOUSEX = 402,                 /* tMOUSEX  */
-    tMOUSEY = 403,                 /* tMOUSEY  */
-    tMOUSEB = 404,                 /* tMOUSEB  */
-    tMOUSEMOD = 405,               /* tMOUSEMOD  */
-    tTRIM = 406,                   /* tTRIM  */
-    tLTRIM = 407,                  /* tLTRIM  */
-    tRTRIM = 408,                  /* tRTRIM  */
-    tSTRING2 = 409,                /* tSTRING2  */
-    tREPLACE = 410,                /* tREPLACE  */
-    tINSTR = 411,                  /* tINSTR  */
-    tRINSTR = 412,                 /* tRINSTR  */
-    tCHOMP = 413,                  /* tCHOMP  */
-    tSYSTEM = 414,                 /* tSYSTEM  */
-    tSYSTEM2 = 415,                /* tSYSTEM2  */
-    tPEEK = 416,                   /* tPEEK  */
-    tPEEK2 = 417,                  /* tPEEK2  */
-    tPOKE = 418,                   /* tPOKE  */
-    tFRNFN_CALL = 419,             /* tFRNFN_CALL  */
-    tFRNFN_CALL2 = 420,            /* tFRNFN_CALL2  */
-    tFRNFN_SIZE = 421,             /* tFRNFN_SIZE  */
-    tFRNBF_ALLOC = 422,            /* tFRNBF_ALLOC  */
-    tFRNBF_FREE = 423,             /* tFRNBF_FREE  */
-    tFRNBF_SIZE = 424,             /* tFRNBF_SIZE  */
-    tFRNBF_DUMP = 425,             /* tFRNBF_DUMP  */
-    tFRNBF_SET = 426,              /* tFRNBF_SET  */
-    tFRNBF_GET = 427,              /* tFRNBF_GET  */
-    tFRNBF_GET2 = 428,             /* tFRNBF_GET2  */
-    tFRNBF_GET_BUFFER = 429,       /* tFRNBF_GET_BUFFER  */
-    tFRNBF_SET_BUFFER = 430,       /* tFRNBF_SET_BUFFER  */
-    tDATE = 431,                   /* tDATE  */
-    tTIME = 432,                   /* tTIME  */
-    tTOKEN = 433,                  /* tTOKEN  */
-    tTOKENALT = 434,               /* tTOKENALT  */
-    tSPLIT = 435,                  /* tSPLIT  */
-    tSPLITALT = 436,               /* tSPLITALT  */
-    tGLOB = 437,                   /* tGLOB  */
-    tSTART_PROGRAM = 438,          /* tSTART_PROGRAM  */
-    tSTART_EXPRESSION = 439,       /* tSTART_EXPRESSION  */
-    tSTART_STRING_EXPRESSION = 440, /* tSTART_STRING_EXPRESSION  */
-    tSTART_ASSIGNMENT = 441,       /* tSTART_ASSIGNMENT  */
-    tSTART_FUNCTION_DEFINITION = 442, /* tSTART_FUNCTION_DEFINITION  */
-    tEVAL = 443,                   /* tEVAL  */
-    tEVAL2 = 444,                  /* tEVAL2  */
-    UMINUS = 445                   /* UMINUS  */
+    tSET = 366,                    /* tSET  */
+    tGET = 367,                    /* tGET  */
+    tCOUNT = 368,                  /* tCOUNT  */
+    tVIEW = 369,                   /* tVIEW  */
+    tDRAW = 370,                   /* tDRAW  */
+    tFLUSH = 371,                  /* tFLUSH  */
+    tELLIPSE = 372,                /* tELLIPSE  */
+    tARC = 373,                    /* tARC  */
+    tPOLYGON = 374,                /* tPOLYGON  */
+    tROUNDRECT = 375,              /* tROUNDRECT  */
+    tSCREENSHOT = 376,             /* tSCREENSHOT  */
+    tBFILESIZE = 377,              /* tBFILESIZE  */
+    tSIN = 378,                    /* tSIN  */
+    tASIN = 379,                   /* tASIN  */
+    tCOS = 380,                    /* tCOS  */
+    tACOS = 381,                   /* tACOS  */
+    tTAN = 382,                    /* tTAN  */
+    tATAN = 383,                   /* tATAN  */
+    tEXP = 384,                    /* tEXP  */
+    tLOG = 385,                    /* tLOG  */
+    tSQRT = 386,                   /* tSQRT  */
+    tSQR = 387,                    /* tSQR  */
+    tMYEOF = 388,                  /* tMYEOF  */
+    tABS = 389,                    /* tABS  */
+    tSIG = 390,                    /* tSIG  */
+    tINT = 391,                    /* tINT  */
+    tCEIL = 392,                   /* tCEIL  */
+    tFLOOR = 393,                  /* tFLOOR  */
+    tFRAC = 394,                   /* tFRAC  */
+    tROUND = 395,                  /* tROUND  */
+    tMOD = 396,                    /* tMOD  */
+    tRAN = 397,                    /* tRAN  */
+    tVAL = 398,                    /* tVAL  */
+    tLEFT = 399,                   /* tLEFT  */
+    tRIGHT = 400,                  /* tRIGHT  */
+    tMID = 401,                    /* tMID  */
+    tLEN = 402,                    /* tLEN  */
+    tMIN = 403,                    /* tMIN  */
+    tMAX = 404,                    /* tMAX  */
+    tSTR = 405,                    /* tSTR  */
+    tINKEY = 406,                  /* tINKEY  */
+    tCHR = 407,                    /* tCHR  */
+    tASC = 408,                    /* tASC  */
+    tHEX = 409,                    /* tHEX  */
+    tDEC = 410,                    /* tDEC  */
+    tBIN = 411,                    /* tBIN  */
+    tUPPER = 412,                  /* tUPPER  */
+    tLOWER = 413,                  /* tLOWER  */
+    tMOUSEX = 414,                 /* tMOUSEX  */
+    tMOUSEY = 415,                 /* tMOUSEY  */
+    tMOUSEB = 416,                 /* tMOUSEB  */
+    tMOUSEMOD = 417,               /* tMOUSEMOD  */
+    tTRIM = 418,                   /* tTRIM  */
+    tLTRIM = 419,                  /* tLTRIM  */
+    tRTRIM = 420,                  /* tRTRIM  */
+    tSTRING2 = 421,                /* tSTRING2  */
+    tREPLACE = 422,                /* tREPLACE  */
+    tINSTR = 423,                  /* tINSTR  */
+    tRINSTR = 424,                 /* tRINSTR  */
+    tCHOMP = 425,                  /* tCHOMP  */
+    tSYSTEM = 426,                 /* tSYSTEM  */
+    tSYSTEM2 = 427,                /* tSYSTEM2  */
+    tPEEK = 428,                   /* tPEEK  */
+    tPEEK2 = 429,                  /* tPEEK2  */
+    tPOKE = 430,                   /* tPOKE  */
+    tFRNFN_CALL = 431,             /* tFRNFN_CALL  */
+    tFRNFN_CALL2 = 432,            /* tFRNFN_CALL2  */
+    tFRNFN_SIZE = 433,             /* tFRNFN_SIZE  */
+    tFRNBF_ALLOC = 434,            /* tFRNBF_ALLOC  */
+    tFRNBF_FREE = 435,             /* tFRNBF_FREE  */
+    tFRNBF_SIZE = 436,             /* tFRNBF_SIZE  */
+    tFRNBF_DUMP = 437,             /* tFRNBF_DUMP  */
+    tFRNBF_SET = 438,              /* tFRNBF_SET  */
+    tFRNBF_GET = 439,              /* tFRNBF_GET  */
+    tFRNBF_GET2 = 440,             /* tFRNBF_GET2  */
+    tFRNBF_GET_BUFFER = 441,       /* tFRNBF_GET_BUFFER  */
+    tFRNBF_SET_BUFFER = 442,       /* tFRNBF_SET_BUFFER  */
+    tDATE = 443,                   /* tDATE  */
+    tTIME = 444,                   /* tTIME  */
+    tTOKEN = 445,                  /* tTOKEN  */
+    tTOKENALT = 446,               /* tTOKENALT  */
+    tSPLIT = 447,                  /* tSPLIT  */
+    tSPLITALT = 448,               /* tSPLITALT  */
+    tGLOB = 449,                   /* tGLOB  */
+    tSTART_PROGRAM = 450,          /* tSTART_PROGRAM  */
+    tSTART_EXPRESSION = 451,       /* tSTART_EXPRESSION  */
+    tSTART_STRING_EXPRESSION = 452, /* tSTART_STRING_EXPRESSION  */
+    tSTART_ASSIGNMENT = 453,       /* tSTART_ASSIGNMENT  */
+    tSTART_FUNCTION_DEFINITION = 454, /* tSTART_FUNCTION_DEFINITION  */
+    tEVAL = 455,                   /* tEVAL  */
+    tEVAL2 = 456,                  /* tEVAL2  */
+    UMINUS = 457                   /* UMINUS  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -288,4 +300,4 @@ extern YYLTYPE yylloc;
 int yyparse (void);
 
 
-#endif /* !YY_YY_BISON_H_INCLUDED  */
+#endif /* !YY_YY_SRC_BISON_H_INCLUDED  */

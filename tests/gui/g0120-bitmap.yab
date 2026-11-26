@@ -2,7 +2,7 @@
 // Derived from: yab 1.8.3 Examples/IconWorld.yab, FakeTransparency.yab and
 //               3D-Curve.yab (double buffering through draw bitmap).
 
-// @requires: gui
+// @requires: gui-widgets
 // @timeout: 30
 
 import harness

@@ -20,6 +20,12 @@ extern "C" {
 /* 1 when the backend is compiled in and a window can be created. */
 int rk_gui_available(void);
 
+/* Start the application thread, if it is not running yet. Both this window and
+   the yab windows (src/yabcompat) share the one BApplication, so the yab layer
+   calls this before it creates its first window. Returns 1 on success; a
+   failure is explained by rk_gui_last_error(). */
+int rk_gui_ensure_app(void);
+
 /* Create the window and its offscreen canvas. Returns 1 on success; on failure
    the backend has already reported the reason with rk_gui_last_error(). */
 int rk_gui_open_window(int width, int height, const char *title);

@@ -1,8 +1,10 @@
 # Phase 2 — Haiku GUI backend
 
 Phase 2 replaces yabasic's Xlib graphic window with a Haiku window and adds the
-yab compatibility layer. This document records the first slice: the graphic
-window. The yab widget layer (`src/yabcompat/`) is the next slice.
+yab compatibility layer. This document records both slices: the graphic window
+and the first part of the yab layer (`src/yabcompat/`), which now runs yab's
+`window`, `view` and `draw` commands. Buttons, lists, menus and the rest of the
+widget set are the next slice.
 
 ## What exists now
 
@@ -13,10 +15,12 @@ window. The yab widget layer (`src/yabcompat/`) is the next slice.
 | yabasic drawing commands on that bridge | `src/rk_graphics.c` | ported from 2.92.1 |
 | TrueType/OpenType font selection | `rk_gui_set_font()` | done |
 | `getbit$` / `putbit` | `rk_graphics.c` | ported, same `rgb W,H:` string format |
-| PNG capture of the canvas | `rk_gui_save_png()` | done; wired to a command in the yab layer, not yet called from yabasic |
+| PNG capture of the canvas | `rk_gui_save_png()` | done; the yab layer's `screenshot` uses its own capture, see below |
 | PostScript file output | `rk_graphics.c` | writes a header and page breaks; not yet complete PostScript |
 | Haiku print server | — | not started |
-| yab widgets, views, draw, BFS helpers | `src/yabcompat/` | not started |
+| yab grammar for `window`, `view`, `draw`, `screenshot` | `src/yabasic.bison`, `src/yabasic.flex` | done |
+| yab windows, views, drawing | `src/yabcompat/rk_yab.cpp` | done for the command set below |
+| yab controls, lists, menus, bitmap, canvas | `src/yabcompat/` | not started; those tests ask for `gui-widgets` and skip |
 
 ## Design decisions
 
@@ -60,6 +64,16 @@ skipping until `src/yabcompat/` exists. That keeps the suite honest in both
 directions: no false passes, and no failing tests for features that are simply
 not written yet.
 
+There are now two yab capabilities, because the layer arrives in slices:
+
+* `gui` — the window, view and draw commands. Probed with a program that opens
+  and closes a window. `g0100`, `g0101`, `g0103` and `g0119` run with it.
+* `gui-widgets` — buttons and the other controls. Probed with a program that
+  creates a `button`; until that command exists the probe fails with a syntax
+  error and the eleven widget tests skip with `(requires gui-widgets)`. When
+  the widget slice lands, the tag comes off those tests one group at a time and
+  the probe starts passing on its own.
+
 The probe is the first thing that touches the backend, so a failing probe used
 to turn every graphical test into a bare `SKIP (requires graphics)` with no
 explanation. Probes now run with `RK_GUI_TRACE=1`, under the same kind of
@@ -70,6 +84,54 @@ reports `graphics` next to `gui`, because those are separate capabilities.
 layer, because it uses yab syntax; the yabasic equivalent is exercised by
 g0130's two `text` calls with an explicit font.
 
+## The yab layer
+
+**The grammar is yab's.** yab 1.8.3 is itself a yabasic fork, so its GUI
+commands are already expressed as yacc productions that emit opcodes
+(`add_command(cVIEW, …)`); `yab/yab-1.8.3/yabasic.bison` is the reference. The
+productions, tokens and flex rules were copied from it into `src/yabasic.bison`
+and `src/yabasic.flex`, reduced to the command groups that are implemented. The
+generated files (`src/bison.c`, `src/bison.h`, `src/flex.c`) stay checked in, so
+a normal build needs neither bison nor flex; `make parser` regenerates them.
+
+**set, get and count are context keywords.** yab reserves them, yabasic does
+not, and existing yabasic programs use `count` as a variable (the CLI test
+c020 does). The scanner therefore has an exclusive start condition, `YABKEY`,
+entered by `window`, `view` and `draw` only. Inside it those three words are
+keywords; the first other token leaves the state and scans normally. The cost is
+small (three rules plus a fallback that re-scans the character) and it keeps
+both dialects working.
+
+**%expect 4.** The yab extensions add four shift/reduce conflicts, and all four
+are resolved the way yab resolves them: a `+` after `window get`/`draw get`
+concatenates the result, and a `,` after `draw get "prop", "text"` continues
+the longer three-string form. The count is asserted, so a future rule that adds
+a conflict makes bison fail instead of silently changing how an existing program
+parses.
+
+**One handler, one bridge.** All the new statements compile to `cYAB*` opcodes
+and are dispatched together: `main.c` has one case group that calls
+`rk_yab_command()`, which pops its own arguments in reverse order (exactly what
+yab's `graphic.c` does) and calls `src/yabcompat/rk_yab.h`. The numeric getters
+are `fYAB*` function ids handled in `function.c`; they sit in the enum's
+argument-count groups, because that ordering is what tells `function()` how many
+arguments to pop. A failed bridge call becomes an ordinary BASIC runtime error
+with the bridge's message, so a missing window or an unreachable app_server
+reads as a normal error.
+
+**Windows own a frame, views own a canvas.** Each yab window has one display
+view and a `frame` `BBitmap` without child views; `draw flush` composites the
+view's bitmap into that frame and invalidates the window, and the window thread
+only ever blits the frame. That is the round 6 rule again: the window thread
+takes no bitmap lock that the interpreter could be holding. A view keeps its
+own `B_RGB32` bitmap with a `BView`, so its contents survive an expose without
+replaying the primitives.
+
+**Screenshots.** yab's `screenshot` captures the screen. RenkuBASIC captures
+the frontmost yab window's frame instead, so the command works the same when
+other applications are open. It is encoded with `BTranslatorRoster` as PNG,
+like `rk_gui_save_png()`.
+
 ## Known gaps
 
 * **PostScript output is incomplete.** The file has a valid header and page
@@ -77,6 +139,18 @@ g0130's two `text` calls with an explicit font.
   written without the prolog that would define them, so the file is not yet
   printable. Completing the prolog, and handing the finished file to the Haiku
   print server, is the printing task left in this phase.
+* **The yab window close box is ignored.** `YabWindowClass::QuitRequested()`
+  returns false for the same reason the yabasic window does: destroying the
+  window from its own thread would leave the interpreter holding dangling
+  pointers. A program closes it with `window close`.
+* **Only the properties the tests need exist.** `window get` knows `width`,
+  `height`, `position-x`, `position-y`, `frame-width` and `frame-height`;
+  `window set` knows `title` and `flags` (`not-h-resizable`, `not-v-resizable`,
+  `not-zoomable`, `not-closable`, `not-movable`, and their positive forms).
+  Anything else is a runtime error naming the property, not a silent no-op.
+* **`draw` covers the primitives the GUI tests use.** There is no `draw bitmap`,
+  no canvas or region, no view removal, and no `message$` for widget events;
+  those belong with the widget slice.
 * **Window keyboard input is buffered, not selectable.** `rk_window_pending()`
   reports buffered window keys, but `rk_window_fd()` stays -1 because a BWindow
   has no file descriptor. `inkey$` therefore still waits on the terminal; a
@@ -292,3 +366,75 @@ and whether the snapshot blit is cheap enough — `g_frame` has no server-side
 copy, so app_server may take the pixels again on the first blit of each frame.
 Both are visible in the next run: the trace either reaches `flush: done` or it
 does not, and the suite's timing shows whether the copy costs anything.
+
+**Round 7 (2026-11-26, fifth run on Haiku, and the first yab slice).** Round 6's
+snapshot fixed the hang: the build is unchanged and clean, the CLI suite stays at
+39 passed / 0 failed / 2 skipped, and the GUI suite went from one passing test to
+two:
+
+```
+PASS  g0130-yabasic-graphics
+PASS  g0131-yabasic-printer
+```
+
+`graphics` is available and `g0130` now completes its whole statement sequence —
+the primitives, `text`, `getbit$` and `putbit` — well inside its 45 second
+timeout. The canvas-lock theory was right: the window thread was blocking the
+interpreter on the bitmap lock that the snapshot removed.
+
+That closes the graphic-window slice, so this round starts the yab layer. What
+is in it:
+
+* `src/yabasic.bison` and `src/yabasic.flex` are now project sources. The yab
+  productions are taken from `yab/yab-1.8.3/yabasic.bison`, and the generated
+  `src/bison.c`, `src/bison.h` and `src/flex.c` remain checked in (verified to be
+  byte-identical to a regeneration from the 2.92.1 sources before any change).
+  `make parser` regenerates them; a normal `cmake .. && make` still needs no
+  bison and no flex.
+* New commands: `window open/close/set`, `window count`, `window get "w","prop"`,
+  `view x,y to x,y, "v", "w"`, `draw set` (colours and a font specification),
+  `draw text/line/rect/roundrect/dot/circle/ellipse/arc/curve/triangle/polygon/
+  flush`, `draw get "text-width"/"max-text-height"`, `screenshot`, and
+  `bfilesize()`. The grammar is yab's, including the `to` separators.
+* `set`, `get` and `count` are keywords only right after `window`, `view` and
+  `draw` (a scanner start condition). Reserving them outright broke c020, which
+  counts with a variable called `count`; that is exactly the yabasic
+  compatibility the merged grammar has to keep.
+* The interpreter glue is `src/yabcompat/rk_yab_cmd.c` (one dispatch for all the
+  `cYAB*` opcodes, popping in reverse like yab's `graphic.c`), the bridge is
+  `src/yabcompat/rk_yab.h`, and the implementation is
+  `src/yabcompat/rk_yab.cpp`. `rk_gui_ensure_app()` is the one startup path both
+  layers use, so there is still a single `BApplication` (decision D6).
+* Tests: `gui` now means windows/views/drawing and covers `g0100`, `g0101`,
+  `g0103` and `g0119`; the eleven widget tests ask for the new `gui-widgets`
+  capability and keep skipping until the widget slice exists, so nothing turns
+  red for a feature that is simply not written.
+
+What was checked here, on the development machine (Linux, no app_server):
+
+* A regeneration from the untouched 2.92.1 grammar produced byte-identical
+  `bison.c`, `bison.h` and `flex.c`, so the toolchain matches the checked-in
+  files (Bison 3.8.2, flex 2.6.4).
+* All C sources and `rk_yab_cmd.c` compile and link against a throwaway stub of
+  the two bridges (`.tools/`, not part of the project), and the CLI suite passes
+  35 / 0 / 6 with that build. The six skips are the tests that only run when
+  `peek$("os")` is Haiku; the stub reports `unix`.
+* A program using every new command runs through the parser, the opcodes and the
+  bridge: `window count` → 1, `window get "width"` → 301 for
+  `window open 100,100 to 400,300`, the whole `draw` set, `draw get
+  "text-width"`, `screenshot` and `bfilesize()`.
+* `src/yabcompat/rk_yab.cpp` and `src/rk_gui.cpp` were syntax-checked with
+  `g++ -fsyntax-only` against Haiku's own public headers, which catches API and
+  type mistakes without a Haiku machine.
+* `g0100`, `g0101` and `g0119` pass against the stub; `g0103` reaches its font
+  assertions and fails only because the stub's text width ignores the font size.
+
+What the next Haiku run has to confirm: that the `gui` probe opens a yab window
+on app_server, and that `g0100`, `g0101`, `g0103` and `g0119` pass there. The
+four tests open real windows, so if one of them stops, the runner's probe log and
+the failing test's stderr say which call it was inside.
+
+Next slice: `button`, `checkbox`, `radiobutton`, `textcontrol`, `text`,
+`textedit`, `slider`, `statusbar`, `option`/`attribute`; then the list controls
+(`listbox`, `dropbox`, `columnbox`, `treebox`, `calendar`, `colorcontrol`), then
+menus, clipboard, `bitmap`, `canvas`/`region` and `message$`.
