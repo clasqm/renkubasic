@@ -346,6 +346,9 @@ double rk_yab_attribute_getnum(const char *name, const char *file);
 const char *rk_yab_translate(const char *text);
 const char *rk_yab_menu_translate(const char *text);
 
+/* `message$`: every widget event collected since the last call. */
+const char *rk_yab_message(void);
+
 /* ---- bitmaps ----------------------------------------------------------- */
 
 /* `bitmap w, h, id`: an offscreen B_RGBA32 bitmap of that size, cleared to

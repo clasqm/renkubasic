@@ -172,7 +172,7 @@ void collect_missing_clauses(char *string, char exclude) {
 %token tCOLUMN tSORT tEXPAND tCOLLAPSE tSELECT tGETS
 /* Menus and the clipboard: `menu`, `submenu` and `subsubmenu` take the command
    words `set`, `copy` and `paste$` from yab. */
-%token tMENU tSUBMENU tSUBSUBMENU tCLIPBOARD tCOPY tPASTE tTRANSLATE
+%token tMENU tSUBMENU tSUBSUBMENU tCLIPBOARD tCOPY tPASTE tTRANSLATE tMESSAGE
 %token tATTRIBUTE
 /* Bitmaps: `bitmap w, h, name`, `bitmap get id, option, arg`,
    `bitmap remove id` and `draw bitmap x, y, id, mode, view`. */
@@ -580,6 +580,10 @@ string_function: tLEFT '(' string_expression ',' expression ')' {create_function
   | tTRANSLATE '(' string_expression ')' {create_function(fYABTRANSLATE);}
   | tMENU tTRANSLATE '(' string_expression ')' {create_function(fYABMENUTRANSLATE);}
   | tCLIPBOARD tPASTE {create_function(fYABCLIPBOARDPASTE);}
+  /* yab spells the event getter `message$`; yab programs call it without
+     parentheses, and the parenthesised form is left out so the grammar keeps
+     its six conflicts. */
+  | tMESSAGE {create_function(fYABMESSAGE);}
   | tATTRIBUTE tGETS '(' string_expression ',' string_expression ')' {create_function(fYABATTRIBUTEGET);}
   | tPEEK2 '(' string_expression ',' string_expression ')' {create_function(fPEEK3);}
   | tTOKENALT '(' string_scalar_or_array ',' string_expression ')' {add_command(cTOKENALT2);}

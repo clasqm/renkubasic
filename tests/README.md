@@ -178,6 +178,7 @@ interpreter.
 | g0118-clipboard | `clipboard copy`/`paste` | yab grammar |
 | g0119-window-lifecycle | repeated open/close, `message$` does not block | `WindowWorld.yab` |
 | g0120-bitmap | screenshot, `bitmap get`, `draw bitmap`, `bitmap remove` | `IconWorld.yab`, `FakeTransparency.yab`, `3D-Curve.yab` |
+| g0121-messages | `message$`, the widget event queue | `WindowWorld.yab`, `MessageWorld.yab` |
 | g0130-yabasic-graphics | yabasic graphic window, primitives, `getbit$`/`putbit`, origin | yabasic manual |
 | g0131-yabasic-printer | `open printer "file"`, PostScript output, page break | yabasic manual |
 

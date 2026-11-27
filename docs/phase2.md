@@ -221,7 +221,16 @@ like `rk_gui_save_png()`.
   than scrolling its contents; a spin control is a text field with `+`/`-`
   buttons, because Haiku has no spinner; `textedit` wraps but has no scrollbars
   yet; and `texturl` keeps its link as a tool tip, since there is no URL
-  handler. `message$` (widget events) is still open.
+  handler.
+* **`message$` reports yab's widget events, with two families still open.**
+  Buttons, check boxes, radio buttons, text controls, sliders, colour
+  controls, the list family (selection and invocation), drop boxes, menus and
+  the window's own activation, deactivation and close request all append their
+  yab spelling to a per-window queue that `message$` drains. `mouse message$`
+  and `keyboard message$` are not implemented: they need mouse tracking and
+  keyboard focus messages per view, not the event queue. Dropped files
+  (`_Dropped`) are not reported either, because a yab view is an offscreen
+  bitmap here and never receives a drop.
 * **Only the widget properties the tests need exist.** `option set` knows
   `label`/`text`, `enabled`, `value` and `tooltip`; `option colour` knows
   `bgcolor`, `highcolor` and `lowcolor`; a slider knows `barcolor` and
@@ -793,5 +802,75 @@ What the next Haiku run has to show: `attributes : available` in the banner, 36
 CLI tests passed with `c084-attributes` among them, and the GUI suite unchanged
 at 17 / 0 / 0.
 
-Next slice: `message$` and widget events; then the tab/box/split polish that the
-gaps list names.
+The first run of the slice probed `attributes` as unavailable, and the probe
+output named the cause: `if-clause starting at line 8 has seen no 'endif'`.
+That was the probe, not the grammar -- yabasic's `if ... then` form always wants
+an `endif`, and only a short `if` (no `then`) ends at the newline. The probe now
+closes its `if`, and the parser had already accepted the three `attribute` lines
+before it.
+
+The rerun probed `attributes` as available and passed every CLI test except
+`c084-attributes`, which failed on "int attribute as a number -- got 0, expected
+42". That was a real defect: `attribute get` read the attribute's bytes and ran
+`atof` over them, so a real `B_INT32_TYPE` attribute (`2a 00 00 00`) read as
+zero while `attribute get$` correctly said "42". The numeric getter now decodes
+the stored type -- int8 through int64, float, double, bool, and `time` as the
+seconds it holds -- and only treats an attribute as text (string and MIME)
+when it is one.
+
+The third run was green: CLI 40 / 0 / 2, GUI unchanged at 17 / 0 / 0, with
+`attributes : available`. That is round 12 accepted.
+
+**Round 13 (2026-11-27).** `message$` and the widget event queue. Notes:
+
+* yab spells the getter `message$`, and its scanner matches the literal
+  `MESSAGE$`; RenkuBASIC adds `tMESSAGE` to the same keyword list. The bare form
+  is the only one in the grammar: `message$()` would put a shift/reduce
+  conflict on the `(`, and yab's own programs call `message$` without
+  parentheses. The grammar still regenerates with exactly six conflicts.
+* A window owns a `std::string` queue. The window thread appends to it under
+  the window lock (its `MessageReceived`, `WindowActivated`, `QuitRequested`),
+  and `message$` locks each window, takes the text and clears it. The registry
+  itself has a `std::mutex`, because windows register before they are shown
+  (their first activation has to find them) while their threads look themselves
+  up; it is never held across a window lock.
+* Widgets are wired where they are registered: a button, check box, radio
+  button, text control, slider or colour control posts one message with a
+  pointer to its registry entry, a list posts separate selection and invocation
+  messages, and drop box items carry the item they selected. The window thread
+  turns each into yab's text, so no lookup by name is needed on the way back.
+* The spellings are yab's: `name|` for a button or radio button,
+  `name:ON|`/`name:OFF|` for a check box, `name:text|` for a text control,
+  `name:value|` for a slider, `name:r:g:b|` for a colour control,
+  `name:_Select:n|` and `name:_Invoke:n|` for the list family (1-based, and the
+  tree box uses the full-list position), `window:item|` for a drop box, and
+  `window:head:...:item|` for a menu. A window also reports
+  `window:_Activated|`, `window:_Deactivated|` and `window:_QuitRequested|`.
+* The close box now reports `_QuitRequested` and still refuses the quit, which
+  is exactly what yab does: the program decides when the window goes. That
+  makes yab's `while not instr(message$, "_QuitRequested|")` loop work, and it
+  is what the manual test m0102 now exits on.
+* `message$` posts nothing and never sleeps: events wait in the queue until the
+  next call. That is a departure from yab, which snoozes 20 ms before it
+  harvests, and it is what lets a program poll in a tight loop.
+* `mouse message$`, `keyboard message$` and dropped files are not part of this
+  slice (see the gaps list); the manual test no longer asks for the keyboard
+  form, which never parsed.
+
+Checked here (Linux, no app_server): the grammar regenerates with the same six
+conflicts; all C sources plus the stub bridges build and link; `print
+message$`, `a$ = message$` and `"[" + message$ + "]"` compile and run against
+the stub as the empty string; the new `g0121` parses and takes its failure at
+the activation assertion, which is the stub's expected answer; the CLI suite
+stays at 35 / 0 / 7; and `rk_yab.cpp` passes `g++ -fsyntax-only` against Haiku's
+public headers (which is how `SetInvokeMessage` was caught -- the list uses
+`SetInvocationMessage`). Not checked: anything on app_server -- no click has
+reached a widget here, so the event strings, the menu paths and the drop box
+form are the next run's business.
+
+What the next Haiku run has to show: GUI 18 / 0 / 0 with `g0121-messages`
+passing (a new window reports `_Activated`), and the CLI suite unchanged at
+40 / 0 / 2.
+
+Next slice: the tab/box/split polish the gaps list names, then `mouse message$`
+and `keyboard message$`.

@@ -7,9 +7,12 @@
 //   * clicking / typing / dragging produces a message in the view
 //   * the message text format matches yab 1.8.3
 //     (button "name|", checkbox "name:ON|" / "name:OFF|",
-//      slider "name:value|", textcontrol "name:text|")
-//   * pressing a key with a focused text control shows a keyboard message
+//      slider "name:value|", textcontrol "name:text|",
+//      listbox "name:_Select:n|", dropbox "window:item|")
 //   * the window can be closed and the program exits with status 0
+//
+// `keyboard message$` and `mouse message$` are not implemented yet, so this
+// test does not ask for them.
 
 // @requires: gui
 // @timeout: 600
@@ -46,11 +49,6 @@ while running
     draw flush "rk_msg_view"
     draw text 10, 40, msg$, "rk_msg_view"
     print msg$
-  endif
-  km$ = keyboard message$("rk_msg_view")
-  if km$ <> "" then
-    draw flush "rk_msg_view"
-    draw text 10, 60, "key: " + km$, "rk_msg_view"
   endif
   if msg$ = "rk_msg_win:_QuitRequested|" running = false
   sleep 0.02

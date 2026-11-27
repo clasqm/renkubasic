@@ -1029,6 +1029,14 @@ void function(struct command *cmd) /* performs a function */
     rk_yab_check();
     result = stSTRING;
     break;
+  /* Every widget event the yab windows have collected since the last call,
+     in yab's "name:event|" spelling, or the empty string when nothing
+     happened. */
+  case fYABMESSAGE:
+    pointer = my_strdup((char *)rk_yab_message());
+    rk_yab_check();
+    result = stSTRING;
+    break;
   /* yab's file attributes. `attribute get$` reads one attribute as text, or
      lists every attribute of the file when the name is empty; `attribute
      get` reads one as a number. */

@@ -1,0 +1,33 @@
+// RenkuBASIC GUI test: message$, the widget event queue
+// Derived from: yab 1.8.3's `message$` (YabInterface::GetMessageString,
+//               YabWindow::MessageReceived) and Examples/WindowWorld.yab.
+//
+// A program cannot click its own widgets, so the event a test can provoke is
+// the one the window reports by itself: its activation. The formats of the
+// widget events themselves are checked by the manual test m0102.
+
+// @requires: gui
+
+import harness
+
+window open 100, 100 to 420, 300, "rk_msg_win", "RenkuBASIC messages"
+
+// The window thread reports the activation asynchronously, so wait for it.
+all$ = ""
+for attempt = 1 to 200
+  all$ = all$ + message$
+  if instr(all$, "rk_msg_win:_Activated") > 0 then
+    break
+  endif
+  sleep 0.01
+next attempt
+assert_true(instr(all$, "rk_msg_win:_Activated") > 0, "a new window reports its activation")
+
+// The queue is empty once it has been read, and a closed window reports
+// nothing at all.
+assert_str$(message$, "", "no events without an event")
+window close "rk_msg_win"
+assert_str$(message$, "", "a closed window reports nothing")
+
+print "g0121 done"
+exit 0

@@ -74,6 +74,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -108,10 +109,17 @@ struct YabWindow {
   float height;
   uint32 resize_mode; /* what `layout` set; applied to new widgets */
   BView *menubar; /* the window's menu bar, created by the first `menu` */
+  std::string messages; /* widget events waiting for `message$`; written by
+                           the window thread under the window lock, read and
+                           cleared by the interpreter thread under it too */
   YabWindow *next;
 };
 
 YabWindow *g_windows = NULL;
+/* The interpreter thread adds and removes windows while their own threads
+   look themselves up, so the registry has its own lock. It is only ever held
+   for a pointer walk, never across a window lock. */
+std::mutex g_window_mutex;
 YabView *g_views = NULL;
 char g_error[512] = "";
 struct YabWidget; /* the widget registry follows copy_pixels() */
@@ -132,6 +140,19 @@ YabWindow *find_window(const char *name) {
     }
   }
   return NULL;
+}
+
+YabWindow *window_entry_of(BWindow *window) {
+  YabWindow *found = NULL;
+
+  std::lock_guard<std::mutex> guard(g_window_mutex);
+  for (YabWindow *entry = g_windows; entry; entry = entry->next) {
+    if (entry->window == window) {
+      found = entry;
+      break;
+    }
+  }
+  return found;
 }
 
 YabView *find_view(const char *name) {
@@ -449,6 +470,58 @@ void forget_window_widgets(YabWindow *window) {
   }
 }
 
+/* yab's widget events. Each message carries a pointer to its registry entry, so
+   the window thread can say which widget changed without another lookup; a
+   selection and an invocation are separate messages because yab reports them
+   under different names (`_Select:` and `_Invoke:`). */
+const uint32 kYabWidgetMessage = 'rkwg';
+const uint32 kYabSelectMessage = 'rkws';
+const uint32 kYabInvokeMessage = 'rkwi';
+
+BMessage *yab_widget_message(YabWidget *widget, uint32 what) {
+  BMessage *message = new BMessage(what);
+
+  message->AddPointer("widget", widget);
+  return message;
+}
+
+/* Point a control at its window, so its click or drag becomes a `message$`
+   event rather than a message nothing reads. Containers have no control of
+   their own and stay quiet, as in yab. */
+void wire_widget_event(YabWidget *widget) {
+  if (!widget || !widget->view || !widget->window || !widget->window->window) {
+    return;
+  }
+  BHandler *target = widget->window->window;
+
+  switch (widget->kind) {
+  case wkBUTTON:
+  case wkCHECKBOX:
+  case wkRADIO:
+  case wkTEXTCONTROL:
+  case wkSLIDER:
+  case wkCOLORCONTROL:
+    if (BControl *control = dynamic_cast<BControl *>(widget->view)) {
+      control->SetMessage(yab_widget_message(widget, kYabWidgetMessage));
+      control->SetTarget(target);
+    }
+    break;
+  case wkLISTBOX:
+  case wkTREEBOX:
+  case wkCOLUMNBOX:
+    if (BListView *list = dynamic_cast<BListView *>(widget->view)) {
+      list->SetSelectionMessage(
+          yab_widget_message(widget, kYabSelectMessage));
+      list->SetInvocationMessage(
+          yab_widget_message(widget, kYabInvokeMessage));
+      list->SetTarget(target);
+    }
+    break;
+  default:
+    break;
+  }
+}
+
 /* The window a widget command lives in: the window itself (yab's root view
    carries the window's name) or a named view inside it. `dx`/`dy` are the
    offset of that view, so a widget's coordinates stay relative to it. */
@@ -550,6 +623,15 @@ bool finish_widget_ex(YabWindow *window, YabWidgetKind kind, const char *id,
   widget->number = number;
   widget->next = g_widgets;
   g_widgets = widget;
+  /* The control is live in its window now, so its message is attached under
+     the window lock; a click that arrives first simply reports nothing. */
+  if (!window->window ||
+      window->window->LockWithTimeout(100000) == B_OK) {
+    wire_widget_event(widget);
+    if (window->window) {
+      window->window->Unlock();
+    }
+  }
   if (out) {
     *out = widget;
   }
@@ -754,13 +836,183 @@ private:
   YabWindow *fOwner;
 };
 
+const uint32 kYabMenuMessage = 'rkym';
+
+bool yab_handles_message(const BMessage *message) {
+  switch (message->what) {
+  case kYabWidgetMessage:
+  case kYabSelectMessage:
+  case kYabInvokeMessage:
+  case kYabMenuMessage:
+    return true;
+  default:
+    return false;
+  }
+}
+
+/* A widget change becomes yab's "name:event|" text. Lists report their
+   position as a 1-based number, a check box says ON or OFF, and a drop box
+   reports the window and the chosen item, as yab does. */
+void yab_record_widget_event(YabWindow *entry, uint32 what, BMessage *message) {
+  YabWidget *widget = NULL;
+  BString text;
+
+  if (message->FindPointer("widget", (void **)&widget) != B_OK || !widget ||
+      !widget->view) {
+    return;
+  }
+  text << widget->name;
+  switch (widget->kind) {
+  case wkBUTTON:
+  case wkRADIO:
+    text << "|";
+    break;
+  case wkCHECKBOX: {
+    BCheckBox *box = dynamic_cast<BCheckBox *>(widget->view);
+    if (!box) {
+      return;
+    }
+    text << ":" << (box->Value() == B_CONTROL_ON ? "ON" : "OFF") << "|";
+    break;
+  }
+  case wkTEXTCONTROL: {
+    BTextControl *control = dynamic_cast<BTextControl *>(widget->view);
+    if (!control) {
+      return;
+    }
+    text << ":" << control->Text() << "|";
+    break;
+  }
+  case wkSLIDER: {
+    BSlider *slider = dynamic_cast<BSlider *>(widget->view);
+    if (!slider) {
+      return;
+    }
+    text << ":" << slider->Value() << "|";
+    break;
+  }
+  case wkCOLORCONTROL: {
+    BColorControl *control = dynamic_cast<BColorControl *>(widget->view);
+    if (!control) {
+      return;
+    }
+    rgb_color colour = control->ValueAsColor();
+    text << ":" << (int)colour.red << ":" << (int)colour.green << ":"
+         << (int)colour.blue << "|";
+    break;
+  }
+  case wkLISTBOX:
+  case wkCOLUMNBOX: {
+    BListView *list = dynamic_cast<BListView *>(widget->view);
+    int index = list ? list->CurrentSelection() : -1;
+    if (index < 0) {
+      return;
+    }
+    text << (what == kYabInvokeMessage ? ":_Invoke:" : ":_Select:")
+         << index + 1 << "|";
+    break;
+  }
+  case wkTREEBOX: {
+    BOutlineListView *tree = dynamic_cast<BOutlineListView *>(widget->view);
+    int index = tree ? tree->FullListCurrentSelection() : -1;
+    if (index < 0) {
+      return;
+    }
+    text << (what == kYabInvokeMessage ? ":_Invoke:" : ":_Select:")
+         << index + 1 << "|";
+    break;
+  }
+  case wkDROPBOX: {
+    /* yab names the window and the chosen item, not the drop box itself. */
+    BMenuItem *item = NULL;
+    if (message->FindPointer("item", (void **)&item) != B_OK || !item) {
+      return;
+    }
+    entry->messages += entry->name;
+    entry->messages += ":";
+    entry->messages += item->Label() ? item->Label() : "";
+    entry->messages += "|";
+    return;
+  }
+  default:
+    return;
+  }
+  entry->messages += text.String();
+}
+
+/* A menu item reports its whole path from the window down, so a submenu is
+   "window:head:submenu:item|" and a sub-submenu one longer, as in yab. */
+void yab_record_menu_event(YabWindow *entry, BMessage *message) {
+  BMenuItem *item = NULL;
+  std::vector<BString> chain;
+
+  if (message->FindPointer("source", (void **)&item) != B_OK || !item) {
+    return;
+  }
+  for (BMenu *menu = item->Menu(); menu; menu = menu->Supermenu()) {
+    if (dynamic_cast<BMenuBar *>(menu) == NULL) {
+      chain.insert(chain.begin(), BString(menu->Name() ? menu->Name() : ""));
+    }
+  }
+  entry->messages += entry->name;
+  for (size_t i = 0; i < chain.size(); i++) {
+    entry->messages += ":";
+    entry->messages += chain[i].String();
+  }
+  entry->messages += ":";
+  entry->messages += item->Label() ? item->Label() : "";
+  entry->messages += "|";
+}
+
+void yab_dispatch_message(BWindow *window, BMessage *message) {
+  YabWindow *entry = window_entry_of(window);
+
+  if (!entry) {
+    return;
+  }
+  if (message->what == kYabMenuMessage) {
+    yab_record_menu_event(entry, message);
+  } else {
+    yab_record_widget_event(entry, message->what, message);
+  }
+}
+
 class YabWindowClass : public BWindow {
 public:
   YabWindowClass(BRect frame, const char *title)
       : BWindow(frame, title ? title : "RenkuBASIC", B_TITLED_WINDOW,
                 B_NOT_ZOOMABLE) {}
 
-  bool QuitRequested() { return false; }
+  /* yab never lets the close box destroy a window behind the program's back:
+     it reports `_QuitRequested` and the program closes the window itself. */
+  bool QuitRequested() {
+    record(":_QuitRequested|");
+    return false;
+  }
+
+  /* yab reports the focus changes of its windows too. */
+  void WindowActivated(bool active) {
+    record(active ? ":_Activated|" : ":_Deactivated|");
+  }
+
+  void MessageReceived(BMessage *message) {
+    if (yab_handles_message(message)) {
+      yab_dispatch_message(this, message);
+      return;
+    }
+    BWindow::MessageReceived(message);
+  }
+
+private:
+  void record(const char *event) {
+    YabWindow *entry = window_entry_of(this);
+
+    if (!entry) {
+      return;
+    }
+    entry->messages += entry->name;
+    entry->messages += event;
+  }
 };
 
 /* Bring a new window up and wait until its looper answers. Returns false when
@@ -1578,6 +1830,14 @@ int rk_yab_window_open(double x1, double y1, double x2, double y2,
   entry->window = window;
   entry->display = display;
 
+  /* Registered before the window runs: its very first `WindowActivated` has to
+     find the entry, or the activation would be lost. */
+  {
+    std::lock_guard<std::mutex> guard(g_window_mutex);
+    entry->next = g_windows;
+    g_windows = entry;
+  }
+
   bool locked = false;
   if (!show_window(window, width, height, &locked)) {
     /* The window's looper is running but did not answer. Deleting a running
@@ -1589,9 +1849,6 @@ int rk_yab_window_open(double x1, double y1, double x2, double y2,
     return 0;
   }
   window->Unlock();
-
-  entry->next = g_windows;
-  g_windows = entry;
   return 1;
 }
 
@@ -1605,21 +1862,25 @@ int rk_yab_window_close(const char *id) {
   }
   /* Unlink before destroying so nothing can reach a half window while its
      views are being deleted. */
-  YabWindow *previous = NULL;
-  for (YabWindow *item = g_windows; item; item = item->next) {
-    if (item == window) {
-      if (previous) {
-        previous->next = item->next;
-      } else {
-        g_windows = item->next;
+  {
+    std::lock_guard<std::mutex> guard(g_window_mutex);
+    YabWindow *previous = NULL;
+    for (YabWindow *item = g_windows; item; item = item->next) {
+      if (item == window) {
+        if (previous) {
+          previous->next = item->next;
+        } else {
+          g_windows = item->next;
+        }
+        break;
       }
-      break;
+      previous = item;
     }
-    previous = item;
   }
   if (!destroy_window(window)) {
     /* Nothing was freed, so put the window back where the rest of the program
        can still find it and try again. */
+    std::lock_guard<std::mutex> guard(g_window_mutex);
     window->next = g_windows;
     g_windows = window;
     return 0;
@@ -3301,7 +3562,10 @@ int rk_yab_list_add(const char *id, const char *item) {
         menu->AddItem(new BSeparatorItem());
         ok = 1;
       } else {
-        BMenuItem *entry = new BMenuItem(item ? item : "", new BMessage('rkdb'));
+        BMessage *message = yab_widget_message(widget, kYabWidgetMessage);
+        BMenuItem *entry = new BMenuItem(item ? item : "", message);
+        message->AddPointer("item", entry);
+        entry->SetTarget(widget->window->window);
         menu->AddItem(entry);
         if (menu->CountItems() == 1) {
           entry->SetMarked(true);
@@ -4167,9 +4431,11 @@ int rk_yab_colorcontrol(double x, double y, const char *id,
   if (!window) {
     return 0;
   }
+  /* The message is attached by wire_widget_event() once the registry entry
+     exists, because the event has to name the widget it came from. */
   BColorControl *control = new BColorControl(
-      BPoint((float)x + dx, (float)y + dy), B_CELLS_32x8, 2, id ? id : "",
-      new BMessage('rkcc'), false);
+      BPoint((float)x + dx, (float)y + dy), B_CELLS_32x8, 2, id ? id : "", NULL,
+      false);
 
   /* The control sizes itself from its corner, so the window clips it rather
      than the command failing when it reaches past the window edge. */
@@ -4385,8 +4651,6 @@ BMenu *menu_path(BMenuBar *bar, const char *head, const char *item,
   return menu;
 }
 
-const uint32 kYabMenuMessage = 'rkym';
-
 int lock_window(YabWindow *window) {
   if (!window || !window->window) {
     set_error("the window is not open");
@@ -4428,6 +4692,7 @@ int rk_yab_menu(const char *head, const char *item, const char *shortcut,
   } else {
     entry = new BMenuItem(item ? item : "", new BMessage(kYabMenuMessage));
     apply_shortcut(entry, shortcut);
+    entry->SetTarget(window->window);
     menu->AddItem(entry);
   }
   window->window->Unlock();
@@ -4532,6 +4797,7 @@ int rk_yab_submenu(const char *head, const char *item, const char *subitem,
   } else {
     entry = new BMenuItem(subitem ? subitem : "", new BMessage(kYabMenuMessage));
     apply_shortcut(entry, shortcut);
+    entry->SetTarget(window->window);
     menu->AddItem(entry);
   }
   window->window->Unlock();
@@ -4640,6 +4906,7 @@ int rk_yab_subsubmenu(const char *head, const char *item, const char *subitem,
     entry = new BMenuItem(subsubitem ? subsubitem : "",
                           new BMessage(kYabMenuMessage));
     apply_shortcut(entry, shortcut);
+    entry->SetTarget(window->window);
     menu->AddItem(entry);
   }
   window->window->Unlock();
@@ -5399,6 +5666,36 @@ double rk_yab_attribute_getnum(const char *name, const char *file) {
     g_attribute_bytes[size] = 0;
   }
   return atof(g_attribute_bytes);
+}
+
+const char *rk_yab_message(void) {
+  static std::string collected;
+  std::vector<YabWindow *> windows;
+
+  clear_error();
+  {
+    std::lock_guard<std::mutex> guard(g_window_mutex);
+    for (YabWindow *entry = g_windows; entry; entry = entry->next) {
+      windows.push_back(entry);
+    }
+  }
+  collected.clear();
+  /* yab hands the events out in the order its windows were created, so the
+     registry is walked backwards: new windows are prepended. */
+  for (size_t i = windows.size(); i > 0; i--) {
+    YabWindow *entry = windows[i - 1];
+    if (!entry->window) {
+      continue;
+    }
+    if (entry->window->LockWithTimeout(100000) != B_OK) {
+      /* A busy window keeps its events; the next call gets them. */
+      continue;
+    }
+    collected += entry->messages;
+    entry->messages.clear();
+    entry->window->Unlock();
+  }
+  return collected.c_str();
 }
 
 } // extern "C"

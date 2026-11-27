@@ -1532,6 +1532,7 @@ static void initialize(void)
   fexplanation[fGETCHAR] = "GETCHAR";
   fexplanation[fYABNUMWINDOWS] = "YABNUMWINDOWS";
   fexplanation[fYABCLIPBOARDPASTE] = "YABCLIPBOARDPASTE";
+  fexplanation[fYABMESSAGE] = "YABMESSAGE";
   fexplanation[fYABATTRIBUTEGET] = "YABATTRIBUTEGET";
   fexplanation[fYABATTRIBUTEGETNUM] = "YABATTRIBUTEGETNUM";
   fexplanation[fYABBFILESIZE] = "YABBFILESIZE";
