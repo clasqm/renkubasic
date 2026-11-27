@@ -1396,6 +1396,10 @@ static void initialize(void)
   cexplanation[cYABSUBSUBMENURADIO] = "YABSUBSUBMENURADIO";
   cexplanation[cYABSUBSUBMENUOPTION] = "YABSUBSUBMENUOPTION";
   cexplanation[cYABCLIPBOARDCOPY] = "YABCLIPBOARDCOPY";
+  cexplanation[cYABBITMAP] = "YABBITMAP";
+  cexplanation[cYABBITMAPDRAW] = "YABBITMAPDRAW";
+  cexplanation[cYABBITMAPGET] = "YABBITMAPGET";
+  cexplanation[cYABBITMAPREMOVE] = "YABBITMAPREMOVE";
   cexplanation[cOPENPRN] = "OPENPRN";
   cexplanation[cCLOSEPRN] = "CLOSEPRN";
   cexplanation[cTESTEOF] = "TESTEOF";
@@ -2108,6 +2112,10 @@ static void run_it()
       case cYABSUBSUBMENURADIO:
       case cYABSUBSUBMENUOPTION:
       case cYABCLIPBOARDCOPY:
+      case cYABBITMAP:
+      case cYABBITMAPDRAW:
+      case cYABBITMAPGET:
+      case cYABBITMAPREMOVE:
         rk_yab_command(currcmd);
         DONE;
       case cRECT:

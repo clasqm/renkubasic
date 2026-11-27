@@ -24,7 +24,7 @@ next slices.
 | yab widget controls, text, sliders, containers, `canvas`/`region` | `src/yabcompat/rk_yab.cpp` | done; the `gui-widgets` tests run |
 | yab lists, tree/column, calendar, colour control | `src/yabcompat/rk_yab.cpp` | done; the `gui-lists` tests run |
 | yab menus, submenus and the clipboard | `src/yabcompat/rk_yab.cpp` | done; the `gui-menus` tests run |
-| yab bitmap | `src/yabcompat/` | not started; that test asks for `gui-bitmaps` |
+| yab bitmaps | `src/yabcompat/rk_yab.cpp` | done; the `gui-bitmaps` test runs |
 
 ## Design decisions
 
@@ -190,8 +190,15 @@ like `rk_gui_save_png()`.
   `window set` knows `title` and `flags` (`not-h-resizable`, `not-v-resizable`,
   `not-zoomable`, `not-closable`, `not-movable`, and their positive forms).
   Anything else is a runtime error naming the property, not a silent no-op.
-* **`draw` covers the primitives the GUI tests use.** There is no `draw bitmap`
-  and no view removal yet.
+* **`draw` covers the primitives the GUI tests use.** There is no view removal
+  yet.
+* **Bitmaps cover the forms the tests use.** `bitmap w, h, id`,
+  `bitmap get id, "path", file`, `bitmap remove id` and
+  `draw bitmap x, y, id, mode, view` work. Not ported: `bitmap get` with
+  `"mime16"`/`"mime32"` (a MIME type's application icon), the numeric-size icon
+  form (`bitmap get 32, id, path`), the scaling form of `draw bitmap`
+  (`draw bitmap x1, y1 to x2, y2, …`), `bitmap get` copying a screen area, and
+  `canvas drag`. Each is an error naming the command, not a silent no-op.
 * **The column box has no horizontal scrolling.** Haiku's `BColumnListView` is
   a private header, so the column box is a plain `BListView` that draws its own
   cells under its own header row; it scrolls vertically only, and a column
@@ -670,8 +677,49 @@ unavailable clipboard as the empty string, which is what yab does. The Linux
 stub reproduces neither the fits check nor the missing application, which is why
 both reached Haiku.
 
-What the next Haiku run has to show: `gui-menus : available`, `g0117` and
-`g0118` passing, and the earlier GUI tests unchanged.
+The first Haiku run of the menu slice probed `gui-menus` as available but failed
+both new tests, for two unrelated reasons. `g0117` asked for a button at
+y 240–264 in a window only 221 pixels tall, so the widget fits check (rightly)
+refused it; the test's window is now 320 pixels tall. `g0118` failed with "the
+clipboard is busy" on its first command, because a `BApplication` owns the
+clipboard and that test copies before it opens any window; `clipboard copy` and
+`clipboard paste$` now start the application first, and paste reads an
+unavailable clipboard as the empty string, which is what yab does. The Linux
+stub reproduces neither the fits check nor the missing application, which is why
+both reached Haiku. The rerun passed everything: GUI 16 / 0 / 1.
 
-Next slice: `bitmap`; then `attribute`, `message$` and widget events; then the
-tab/box/split polish that the gaps list names.
+**Round 11 (2026-11-27).** Bitmaps: `bitmap w, h, id`,
+`bitmap get id, "path", file`, `bitmap remove id` and
+`draw bitmap x, y, id, mode, view`. Notes:
+
+* The bitmap registry holds name -> `BBitmap`. Every bitmap is `B_RGBA32` with a
+  child view named like the bitmap, as yab's bitmaps have, and is cleared to
+  transparent black.
+* `draw bitmap` blits into a view's canvas with yab's modes in yab's order
+  (`copy`, `alpha`, `invert`, `max`, `min`, `subtract`, `add`, `blend`),
+  matched case-insensitively anywhere in the string. The view keeps its drawing
+  mode afterwards, as in yab.
+* `bitmap get` with `"path"` asks the file for its tracker icon
+  (`BNodeInfo::GetTrackerIcon`, a 32 by 32 `B_CMAP8` icon) and paints that over
+  a transparent bitmap with `B_OP_OVER`, so the icon's transparent pixels stay
+  transparent; yab copies it with the default `B_OP_COPY`.
+* `g0120` follows the shape of yab's `3D-Curve.yab`, `FakeTransparency.yab` and
+  `IconWorld.yab`: draw into a view, capture it with `screenshot`, load the file
+  as a bitmap, blit it back with `copy` and `alpha`, capture again, then remove
+  the bitmap.
+
+Checked here (Linux, no app_server): the grammar regenerates with the expected
+six conflicts, so the bitmap productions add none; all C sources plus the stub
+bridges build and link; `g0120` runs end to end against the stub, as do `g0117`,
+`g0118` and `g0112`; a scratch program exercises `bitmap w, h, id`, four drawing
+modes, a file's tracker icon, a screenshot of the result and both removes; the
+CLI suite stays at 35 / 0 / 6; and `rk_yab.cpp` passes `g++ -fsyntax-only`
+against Haiku's public headers. Not checked: anything on app_server -- no bitmap
+has been blitted there, and the icon path needs a real `BNode` and a real file,
+so what the blit looks like is the next run's business.
+
+What the next Haiku run has to show: `gui-bitmaps : available`, `g0120`
+passing, and the other sixteen GUI tests unchanged.
+
+Next slice: `attribute`, `message$` and widget events; then the tab/box/split
+polish that the gaps list names.

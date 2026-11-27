@@ -264,6 +264,7 @@ SPLITVIEW {BEGIN(YABKEY);return tSPLITVIEW;}
 STACKVIEW {BEGIN(YABKEY);return tSTACKVIEW;}
 CANVAS {BEGIN(YABKEY);return tCANVAS;}
 REGION {BEGIN(YABKEY);return tREGION;}
+BITMAP {BEGIN(YABKEY);return tBITMAP;}
 MENU {BEGIN(YABKEY);return tMENU;}
 SUBMENU {BEGIN(YABKEY);return tSUBMENU;}
 SUBSUBMENU {BEGIN(YABKEY);return tSUBSUBMENU;}
@@ -289,6 +290,7 @@ COLORCONTROL {BEGIN(YABKEY);return tCOLORCONTROL;}
 <YABKEY>COLUMN/[ \t] {BEGIN(INITIAL);return tCOLUMN;}
   /* `clipboard copy` and `clipboard paste$`; yab spells the getter with the
      dollar, and both words are only keywords after `clipboard`. */
+<YABKEY>BITMAP {BEGIN(INITIAL);return tBITMAP;} /* `draw bitmap` */
 <YABKEY>COPY {BEGIN(INITIAL);return tCOPY;}
 <YABKEY>"PASTE$" {BEGIN(INITIAL);return tPASTE;}
 <YABKEY>"TRANSLATE$" {BEGIN(INITIAL);return tTRANSLATE;}

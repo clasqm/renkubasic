@@ -871,6 +871,38 @@ void rk_yab_command(struct command *cmd) {
     expect(rk_yab_clipboard_copy(text));
     break;
   }
+  case cYABBITMAP: {
+    char *id = take_string();
+    double height = take_number();
+    double width = take_number();
+
+    expect(rk_yab_bitmap(width, height, id));
+    break;
+  }
+  case cYABBITMAPDRAW: {
+    char *view = take_string();
+    char *mode = take_string();
+    char *id = take_string();
+    double y = take_number();
+    double x = take_number();
+
+    expect(rk_yab_bitmap_draw(x, y, id, mode, view));
+    break;
+  }
+  case cYABBITMAPGET: {
+    char *argument = take_string();
+    char *option = take_string();
+    char *id = take_string();
+
+    expect(rk_yab_bitmap_get(id, option, argument));
+    break;
+  }
+  case cYABBITMAPREMOVE: {
+    char *id = take_string();
+
+    expect(rk_yab_bitmap_remove(id));
+    break;
+  }
   case cYABTREEADD: {
     char *item = take_string();
     char *id = take_string();

@@ -45,6 +45,8 @@
 #include <MenuField.h>
 #include <MenuItem.h>
 #include <Message.h>
+#include <Node.h>
+#include <NodeInfo.h>
 #include <OutlineListView.h>
 #include <PopUpMenu.h>
 #include <RadioButton.h>
@@ -4763,6 +4765,222 @@ const char *rk_yab_menu_translate(const char *text) {
   /* yab splits a menu key on ':' and translates each part; with no catalog
      every part keeps its text, so the key comes back unchanged. */
   return rk_yab_translate(text);
+}
+
+/* ---- bitmaps ----------------------------------------------------------- */
+
+/* yab keeps its bitmaps in one list, named by the view their BBitmap carries;
+   RenkuBASIC keeps the name on the entry instead, because a BBitmap can be
+   searched for a view only by walking them. */
+struct YabBitmap {
+  char *name;
+  BBitmap *bitmap; /* B_RGBA32 with a child view named `name` */
+  YabBitmap *next;
+};
+
+YabBitmap *g_bitmaps = NULL;
+
+YabBitmap *find_bitmap(const char *name) {
+  for (YabBitmap *bitmap = g_bitmaps; bitmap; bitmap = bitmap->next) {
+    if (bitmap->name && name && strcmp(bitmap->name, name) == 0) {
+      return bitmap;
+    }
+  }
+  return NULL;
+}
+
+/* A cleared B_RGBA32 bitmap with the child view yab's bitmaps have, so drawing
+   into it and blitting from it both work. */
+BBitmap *create_bitmap(int width, int height, const char *name) {
+  BRect frame(0.0f, 0.0f, (float)(width - 1), (float)(height - 1));
+  BBitmap *bitmap = new BBitmap(frame, B_RGBA32, true);
+
+  if (!bitmap || bitmap->InitCheck() != B_OK) {
+    delete bitmap;
+    return NULL;
+  }
+  BView *view = new BView(frame, name ? name : "", B_FOLLOW_NONE, 0);
+  bitmap->Lock();
+  bitmap->AddChild(view);
+  bitmap->Unlock();
+  memset(bitmap->Bits(), 0, (size_t)bitmap->BitsLength());
+  return bitmap;
+}
+
+YabBitmap *keep_bitmap(const char *name, BBitmap *bitmap) {
+  YabBitmap *entry = new YabBitmap;
+
+  entry->name = strdup(name);
+  entry->bitmap = bitmap;
+  entry->next = g_bitmaps;
+  g_bitmaps = entry;
+  return entry;
+}
+
+/* yab's drawing modes, in its order and matched the same way. */
+bool bitmap_mode(const char *option, drawing_mode *mode) {
+  BString text(option ? option : "");
+
+  if (text.IFindFirst("copy") >= 0) {
+    *mode = B_OP_COPY;
+  } else if (text.IFindFirst("alpha") >= 0) {
+    *mode = B_OP_ALPHA;
+  } else if (text.IFindFirst("invert") >= 0) {
+    *mode = B_OP_INVERT;
+  } else if (text.IFindFirst("max") >= 0) {
+    *mode = B_OP_MAX;
+  } else if (text.IFindFirst("min") >= 0) {
+    *mode = B_OP_MIN;
+  } else if (text.IFindFirst("subtract") >= 0) {
+    *mode = B_OP_SUBTRACT;
+  } else if (text.IFindFirst("add") >= 0) {
+    *mode = B_OP_ADD;
+  } else if (text.IFindFirst("blend") >= 0) {
+    *mode = B_OP_BLEND;
+  } else {
+    return false;
+  }
+  return true;
+}
+
+int rk_yab_bitmap(double width, double height, const char *id) {
+  clear_error();
+  int w = (int)width;
+  int h = (int)height;
+  BBitmap *bitmap;
+
+  if (!id || !*id) {
+    set_error("bitmap: a bitmap needs a name");
+    return 0;
+  }
+  if (find_bitmap(id)) {
+    snprintf(g_error, sizeof(g_error), "bitmap: '%s' is already a bitmap", id);
+    return 0;
+  }
+  if (w < 1 || h < 1 || w > 8192 || h > 8192) {
+    set_error("bitmap: the size is out of range");
+    return 0;
+  }
+  bitmap = create_bitmap(w, h, id);
+  if (!bitmap) {
+    set_error("bitmap: could not allocate the bitmap");
+    return 0;
+  }
+  keep_bitmap(id, bitmap);
+  return 1;
+}
+
+int rk_yab_bitmap_draw(double x, double y, const char *id, const char *mode_name,
+                       const char *view_name) {
+  clear_error();
+  YabBitmap *bitmap = find_bitmap(id);
+  YabView *view = find_view(view_name);
+  drawing_mode mode;
+
+  if (!bitmap) {
+    snprintf(g_error, sizeof(g_error), "draw bitmap: '%s' is not a bitmap",
+             id ? id : "");
+    return 0;
+  }
+  if (!view) {
+    snprintf(g_error, sizeof(g_error), "draw bitmap: view '%s' does not exist",
+             view_name ? view_name : "");
+    return 0;
+  }
+  if (!bitmap_mode(mode_name, &mode)) {
+    snprintf(g_error, sizeof(g_error), "draw bitmap: '%s' is not a drawing mode",
+             mode_name ? mode_name : "");
+    return 0;
+  }
+  view->canvas->Lock();
+  drawing_mode previous = view->view->DrawingMode();
+  view->view->SetDrawingMode(mode);
+  view->view->DrawBitmap(bitmap->bitmap, BPoint((float)x, (float)y));
+  view->view->SetDrawingMode(previous);
+  view->view->Sync();
+  view->canvas->Unlock();
+  return 1;
+}
+
+int rk_yab_bitmap_get(const char *id, const char *option, const char *argument) {
+  clear_error();
+  BString text(option ? option : "");
+
+  if (!id || !*id) {
+    set_error("bitmap get: a bitmap needs a name");
+    return 0;
+  }
+  if (find_bitmap(id)) {
+    snprintf(g_error, sizeof(g_error), "bitmap get: '%s' is already a bitmap",
+             id);
+    return 0;
+  }
+  /* Only the file form is ported: yab's "mime16" and "mime32" ask the MIME
+     database for an application icon, which no test or example here uses. */
+  if (text.IFindFirst("path") < 0) {
+    snprintf(g_error, sizeof(g_error),
+             "bitmap get: '%s' is not an option (only \"path\")",
+             option ? option : "");
+    return 0;
+  }
+  BNode node(argument ? argument : "");
+  if (node.InitCheck() != B_OK) {
+    snprintf(g_error, sizeof(g_error), "bitmap get: '%s' cannot be opened",
+             argument ? argument : "");
+    return 0;
+  }
+  BNodeInfo info(&node);
+  BBitmap *icon = new BBitmap(BRect(0.0f, 0.0f, 31.0f, 31.0f), B_CMAP8);
+  if (!icon || icon->InitCheck() != B_OK) {
+    delete icon;
+    set_error("bitmap get: could not allocate the icon");
+    return 0;
+  }
+  if (info.GetTrackerIcon(icon, B_LARGE_ICON) != B_OK) {
+    delete icon;
+    snprintf(g_error, sizeof(g_error), "bitmap get: '%s' has no icon",
+             argument ? argument : "");
+    return 0;
+  }
+  BBitmap *target = create_bitmap(32, 32, id);
+  if (!target) {
+    delete icon;
+    return 0;
+  }
+  target->Lock();
+  BView *view = target->FindView(id);
+  if (view) {
+    view->SetDrawingMode(B_OP_OVER);
+    view->DrawBitmap(icon, BPoint(0.0f, 0.0f));
+    view->Sync();
+  }
+  target->Unlock();
+  delete icon;
+  keep_bitmap(id, target);
+  return 1;
+}
+
+int rk_yab_bitmap_remove(const char *id) {
+  clear_error();
+  YabBitmap *previous = NULL;
+
+  for (YabBitmap *bitmap = g_bitmaps; bitmap;
+       previous = bitmap, bitmap = bitmap->next) {
+    if (bitmap->name && id && strcmp(bitmap->name, id) == 0) {
+      if (previous) {
+        previous->next = bitmap->next;
+      } else {
+        g_bitmaps = bitmap->next;
+      }
+      free(bitmap->name);
+      delete bitmap->bitmap; /* deletes the child view with it */
+      delete bitmap;
+      return 1;
+    }
+  }
+  snprintf(g_error, sizeof(g_error), "bitmap remove: '%s' is not a bitmap",
+           id ? id : "");
+  return 0;
 }
 
 } // extern "C"

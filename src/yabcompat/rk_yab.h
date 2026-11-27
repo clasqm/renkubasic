@@ -327,6 +327,22 @@ const char *rk_yab_clipboard_paste(void);
 const char *rk_yab_translate(const char *text);
 const char *rk_yab_menu_translate(const char *text);
 
+/* ---- bitmaps ----------------------------------------------------------- */
+
+/* `bitmap w, h, id`: an offscreen B_RGBA32 bitmap of that size, cleared to
+   transparent black, kept under `id` for `draw bitmap`. */
+int rk_yab_bitmap(double width, double height, const char *id);
+/* `draw bitmap x, y, id, mode, view`: blit the bitmap into a view. The mode is
+   yab's: "copy", "alpha", "invert", "max", "min", "subtract", "add" or
+   "blend", matched case-insensitively anywhere in the string. */
+int rk_yab_bitmap_draw(double x, double y, const char *id, const char *mode,
+                       const char *view);
+/* `bitmap get id, option, path`: an icon for a file ("path") or a MIME type
+   ("mime16", "mime32"). */
+int rk_yab_bitmap_get(const char *id, const char *option, const char *argument);
+/* `bitmap remove id`: frees the bitmap. */
+int rk_yab_bitmap_remove(const char *id);
+
 /* ---- program helpers -------------------------------------------------- */
 
 /* Write the screen area x1,y1 to x2,y2 of the frontmost yab window as PNG.

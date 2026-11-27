@@ -413,6 +413,9 @@ enum cmd_type {
     cYABSUBMENU, cYABSUBMENURADIO, cYABSUBMENUOPTION,
     cYABSUBSUBMENU, cYABSUBSUBMENURADIO, cYABSUBSUBMENUOPTION,
     cYABCLIPBOARDCOPY,
+    /* yab's bitmaps: an offscreen pixel buffer that `draw bitmap` blits into a
+       view, used for double buffering and for tracker icons. */
+    cYABBITMAP, cYABBITMAPDRAW, cYABBITMAPGET, cYABBITMAPREMOVE,
 
     cLAST_COMMAND			/* no command, just marks end of list */
 };

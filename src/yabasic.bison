@@ -173,6 +173,9 @@ void collect_missing_clauses(char *string, char exclude) {
 /* Menus and the clipboard: `menu`, `submenu` and `subsubmenu` take the command
    words `set`, `copy` and `paste$` from yab. */
 %token tMENU tSUBMENU tSUBSUBMENU tCLIPBOARD tCOPY tPASTE tTRANSLATE
+/* Bitmaps: `bitmap w, h, name`, `bitmap get id, option, arg`,
+   `bitmap remove id` and `draw bitmap x, y, id, mode, view`. */
+%token tBITMAP
 
 %token tSIN tASIN tCOS tACOS tTAN tATAN tEXP tLOG
 %token tSQRT tSQR tMYEOF tABS tSIG
@@ -454,6 +457,10 @@ statement:  /* empty */
   | tSUBSUBMENU tSET string_expression ',' string_expression ',' string_expression ',' string_expression ',' string_expression ',' string_expression {add_command(cYABSUBSUBMENUOPTION);}
   | tSUBSUBMENU tSET string_expression ',' string_expression ',' string_expression ',' expression ',' string_expression {add_command(cYABSUBSUBMENURADIO);}
   | tCLIPBOARD tCOPY string_expression {add_command(cYABCLIPBOARDCOPY);}
+  | tBITMAP expression ',' expression ',' string_expression {add_command(cYABBITMAP);}
+  | tBITMAP tGET string_expression ',' string_expression ',' string_expression {add_command(cYABBITMAPGET);}
+  | tBITMAP tREMOVE string_expression {add_command(cYABBITMAPREMOVE);}
+  | tDRAW tBITMAP expression ',' expression ',' string_expression ',' string_expression ',' string_expression {add_command(cYABBITMAPDRAW);}
   | tOPEN tPRINTER {create_openprinter(0);}
   | tOPEN tPRINTER string_expression {create_openprinter(1);}
   | tCLOSE tPRINTER {add_command(cCLOSEPRN);}
