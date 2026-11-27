@@ -1613,6 +1613,10 @@ void signal_handler(int sig) /* handle signals */
 {
   signal(sig, SIG_DFL);
   if (program_state == spFINISHED) {
+    /* The program has already ended, so this signal is not a BASIC error and
+       no position can be shown for it. Say which signal arrived anyway: a run
+       that exits 1 with nothing else printed is otherwise impossible to read. */
+    fprintf(stderr, "---Signal %d arrived after the program finished.\n", sig);
     exit(1);
   }
   signal_arrived = sig;

@@ -71,6 +71,7 @@
 #include <strings.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <unistd.h>
 
 #include <vector>
 
@@ -799,9 +800,33 @@ void destroy_view(YabView *view) {
   delete view;
 }
 
-void destroy_window(YabWindow *window) {
+/* Destroys a window and everything registered for it. Returns 0 when the
+   window's thread never answered the lock: its views may still be in use, so
+   nothing is freed and the window stays usable. */
+int destroy_window(YabWindow *window) {
   if (!window) {
-    return;
+    return 1;
+  }
+  if (window->window) {
+    /* BWindow::Quit() needs the lock and waits for the window thread itself,
+       so everything below is safe once it has returned. If the lock never
+       arrives, the thread is still reading those views: freeing them would
+       leave a crash waiting for the next message, and the window would report
+       itself closed while its thread is still alive. Twenty short tries ride
+       out a busy app_server. */
+    bool up = false;
+    for (int i = 0; i < 20 && !up; i++) {
+      if (window->window->LockWithTimeout(100000) == B_OK) {
+        up = true;
+      } else {
+        usleep(10000);
+      }
+    }
+    if (!up) {
+      set_error("the window did not respond to window close");
+      return 0;
+    }
+    window->window->Quit();
   }
   /* Widget controls are children of the window and are deleted with it; only
      the registry entries have to go. */
@@ -825,16 +850,10 @@ void destroy_window(YabWindow *window) {
     view = next;
   }
 
-  if (window->window) {
-    if (window->window->LockWithTimeout(200000) == B_OK) {
-      window->window->Quit();
-    }
-    /* When the lock timed out the window is left to the process exit; deleting
-       a running BLooper would be worse. */
-  }
   delete window->frame;
   free(window->name);
   delete window;
+  return 1;
 }
 
 int32 window_flags_from_text(const char *text, uint32 current, char *error,
@@ -1582,8 +1601,8 @@ int rk_yab_window_close(const char *id) {
              id ? id : "");
     return 0;
   }
-  /* Unlink before destroying: a failing lock must not leave a half window in
-     the list, and the views are destroyed with it. */
+  /* Unlink before destroying so nothing can reach a half window while its
+     views are being deleted. */
   YabWindow *previous = NULL;
   for (YabWindow *item = g_windows; item; item = item->next) {
     if (item == window) {
@@ -1596,7 +1615,13 @@ int rk_yab_window_close(const char *id) {
     }
     previous = item;
   }
-  destroy_window(window);
+  if (!destroy_window(window)) {
+    /* Nothing was freed, so put the window back where the rest of the program
+       can still find it and try again. */
+    window->next = g_windows;
+    g_windows = window;
+    return 0;
+  }
   return 1;
 }
 

@@ -483,7 +483,7 @@ for f in "${FILES[@]}"; do
   # other tests may compare stderr or require it to be empty.
   trace_backend=0
   case ",$(printf '%s' "$requires" | tr -d ' ')," in
-    *",gui,"*|*",graphics,"*) trace_backend=1 ;;
+    *",gui,"*|*",gui-"*|*",graphics,"*) trace_backend=1 ;;
   esac
   if [ -n "$(directive "$f" expect-stderr-contains)" ] \
      || [ "$(directive "$f" expect-empty-output)" = "1" ]; then

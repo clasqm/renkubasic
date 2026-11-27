@@ -718,8 +718,29 @@ against Haiku's public headers. Not checked: anything on app_server -- no bitmap
 has been blitted there, and the icon path needs a real `BNode` and a real file,
 so what the blit looks like is the next run's business.
 
+The first Haiku run of the slice passed `g0120` and probed `gui-bitmaps` as
+available, but `g0115-views` failed with status 1 after printing its own last
+line, and with nothing on stderr. That combination has only two possible
+causes: an assertion in the test harness (which prints what it asserted before
+exiting) or a signal that arrives once the program has finished, which the
+signal handler turns into a bare `exit(1)`. So the handler now prints the signal
+number instead of exiting silently, and the runner exports `RK_GUI_TRACE` for
+the widget suites as it already did for `gui` and `graphics`, so the next
+failure shows how far the backend got.
+
+Reading the close path for the cause found a real defect worth fixing whatever
+the signal turns out to be: `destroy_window` deleted a window's views even when
+the window thread never gave up its lock, leaving a running thread with
+pointers to freed views -- a crash waiting for the next message, and a `window
+close` that reports success. It now tries the lock for two seconds in short
+steps; when the lock still does not arrive nothing is freed, the window goes
+back into the registry, and `window close` fails with "the window did not
+respond to window close" instead of pretending.
+
 What the next Haiku run has to show: `gui-bitmaps : available`, `g0120`
-passing, and the other sixteen GUI tests unchanged.
+passing, `g0115` passing again, and the other fifteen GUI tests unchanged.
+Should `g0115` fail again, its stderr now names the signal, and the trace says
+which backend step came last.
 
 Next slice: `attribute`, `message$` and widget events; then the tab/box/split
 polish that the gaps list names.
