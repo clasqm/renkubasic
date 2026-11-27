@@ -296,7 +296,9 @@ close #1
 attribute set "string", "RENKU:probe", "yes", f$
 r$ = attribute get$("RENKU:probe", f$)
 attribute clear "RENKU:probe", f$
-if r$ <> "yes" then exit 1
+if r$ <> "yes" then
+  exit 1
+endif
 exit 0'; then
     ATTRIBUTES_OK=1
   else
