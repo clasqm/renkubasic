@@ -659,6 +659,17 @@ checked: anything on app_server. No menu bar has been drawn or opened, and no
 item has been clicked, so layout of the bar, submenu placement and the radio and
 check marks are the next run's business.
 
+The first Haiku run of this slice probed `gui-menus` as available but failed
+both new tests, for two unrelated reasons. `g0117` asked for a button at
+y 240–264 in a window only 221 pixels tall, so the widget fits check (rightly)
+refused it; the test's window is now 320 pixels tall. `g0118` failed with "the
+clipboard is busy" on its first command, because a `BApplication` owns the
+clipboard and that test copies before it opens any window; `clipboard copy` and
+`clipboard paste$` now start the application first, and paste reads an
+unavailable clipboard as the empty string, which is what yab does. The Linux
+stub reproduces neither the fits check nor the missing application, which is why
+both reached Haiku.
+
 What the next Haiku run has to show: `gui-menus : available`, `g0117` and
 `g0118` passing, and the earlier GUI tests unchanged.
 

@@ -7,7 +7,7 @@
 
 import harness
 
-window open 100, 100 to 460, 320, "rk_menu_win", "RenkuBASIC menus"
+window open 100, 100 to 460, 420, "rk_menu_win", "RenkuBASIC menus"
 view 0, 0 to 360, 220, "rk_menu_view", "rk_menu_win"
 draw set "bgcolor", 240, 240, 240, "rk_menu_view"
 draw text 10, 30, "menu test window", "rk_menu_view"

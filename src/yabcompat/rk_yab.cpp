@@ -4692,7 +4692,16 @@ int rk_yab_clipboard_copy(const char *text) {
   clear_error();
   const char *copy = text ? text : "";
 
-  if (!be_clipboard || !be_clipboard->Lock()) {
+  /* The clipboard belongs to a BApplication, and a program may copy before it
+     opens its first window, so the application is started here. */
+  if (!rk_gui_ensure_app() || !be_clipboard) {
+    set_error(rk_gui_last_error());
+    if (!g_error[0]) {
+      set_error("clipboard copy: the application is not running");
+    }
+    return 0;
+  }
+  if (!be_clipboard->Lock()) {
     set_error("clipboard copy: the clipboard is busy");
     return 0;
   }
@@ -4720,7 +4729,12 @@ const char *rk_yab_clipboard_paste(void) {
 
   clear_error();
   text.SetTo("");
-  if (be_clipboard && be_clipboard->Lock()) {
+  if (!rk_gui_ensure_app() || !be_clipboard) {
+    /* yab reads an empty clipboard as an empty string, and so does this when
+       there is no application to ask. */
+    return text.String();
+  }
+  if (be_clipboard->Lock()) {
     BMessage *clip = be_clipboard->Data();
     const void *data = NULL;
     ssize_t length = 0;
