@@ -588,6 +588,10 @@ them, plus the getters. Notes:
   exactly as yab's `graphic.c` does.
 * `colorcontrol` is a `BColorControl`, created without the size check the other
   widgets go through, because it sizes itself from its corner.
+* `columnbox colour` matches its option the way yab does: case-insensitively
+  anywhere in the string and in yab's order, so "Selection-Active" and
+  "Row-Divider" from yab's own Filebox example work, and "bgcolor" is rejected
+  just as yab rejects it.
 * The drop box reports 1-based positions, unlike yab's 0-based
   `DropBoxGetNum`; see the gaps list.
 

@@ -36,7 +36,7 @@ cell$ = columnbox get$ "rk_cols", 2, 1
 assert_str$(cell$, "first", "columnbox get cell")
 
 columnbox select "rk_cols", 2
-columnbox colour "rk_cols", "bgcolor", 240, 240, 200
+columnbox colour "rk_cols", "background", 240, 240, 200
 
 sleep 0.1
 window close "rk_tree_win"

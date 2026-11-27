@@ -3982,21 +3982,24 @@ int rk_yab_columnbox_colour(const char *id, const char *option, int r, int g,
   YabColumnList *list = column_list(widget);
 
   if (list) {
-    if (strcmp(option, "background") == 0) {
-      list->SetBackgroundColour(rgb_from(r, g, b));
-      ok = 1;
-    } else if (strcmp(option, "text") == 0) {
-      list->SetTextColour(rgb_from(r, g, b));
-      ok = 1;
-    } else if (strcmp(option, "selection") == 0 ||
-               strcmp(option, "non-focus-selection") == 0) {
-      list->SetSelectionColour(rgb_from(r, g, b));
-      ok = 1;
-    } else if (strcmp(option, "selection-text") == 0) {
+    /* yab matches these case-insensitively anywhere in the string and in this
+       order, so its examples' "Selection-Active" and "Row-Divider" work too. */
+    BString opt(option);
+    if (opt.IFindFirst("selection-text") >= 0) {
       list->SetSelectionTextColour(rgb_from(r, g, b));
       ok = 1;
-    } else if (strcmp(option, "row-divider") == 0) {
+    } else if (opt.IFindFirst("non-focus-selection") >= 0 ||
+               opt.IFindFirst("selection") >= 0) {
+      list->SetSelectionColour(rgb_from(r, g, b));
+      ok = 1;
+    } else if (opt.IFindFirst("text") >= 0) {
+      list->SetTextColour(rgb_from(r, g, b));
+      ok = 1;
+    } else if (opt.IFindFirst("row-divider") >= 0) {
       list->SetDividerColour(rgb_from(r, g, b));
+      ok = 1;
+    } else if (opt.IFindFirst("background") >= 0) {
+      list->SetBackgroundColour(rgb_from(r, g, b));
       ok = 1;
     }
   }
