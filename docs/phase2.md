@@ -602,7 +602,11 @@ keyword states, the argument popping and the `get$`/`get` split; the CLI suite
 stays at 35 / 0 / 6; and `rk_yab.cpp` passes `g++ -fsyntax-only` against Haiku's
 own public headers. That check found three API mistakes, now fixed: `BListView`
 and `BOutlineListView` take the selection type after the name, and a
-`BListItem` is selected with `Select()`/`Deselect()`, not `SetSelected()`.
+`BListItem` is selected with `Select()`/`Deselect()`, not `SetSelected()`. The
+first Haiku build then failed to link one more: `BListItem::DrawItem` is
+declared in the header but libbe defines it only inside its own subclass, so the
+row's fallback path paints a plain row with the standard list colours instead of
+calling it.
 
 What the next Haiku run has to show: `gui-lists : available`, `g0112`, `g0113`
 and `g0116` passing, and the earlier GUI tests unchanged.

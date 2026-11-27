@@ -1068,7 +1068,14 @@ void YabColumnRow::DrawItem(BView *owner, BRect frame, bool complete) {
   YabColumnList *list = dynamic_cast<YabColumnList *>(owner);
 
   if (!list) {
-    BListItem::DrawItem(owner, frame, complete);
+    /* BListItem declares DrawItem but libbe defines it only inside its own
+       subclass, so there is no base implementation to fall back on: paint a
+       plain row with the standard list colours instead. */
+    (void)complete;
+    owner->SetLowColor(ui_color(IsSelected()
+                                    ? B_LIST_SELECTED_BACKGROUND_COLOR
+                                    : B_LIST_BACKGROUND_COLOR));
+    owner->FillRect(frame, B_SOLID_LOW);
     return;
   }
 
@@ -1312,7 +1319,6 @@ void YabCalendar::MessageReceived(BMessage *message) {
 
 void YabCalendar::Draw(BRect update) {
   BRect bounds = Bounds();
-  float ch = CellHeight();
   float cw = CellWidth();
   int first = yab_weekday(fYear, fMonth, 1);
   /* Monday first, as in yab's calendar. */
