@@ -5359,8 +5359,44 @@ double rk_yab_attribute_getnum(const char *name, const char *file) {
   if (size == 0) {
     return 0.0;
   }
-  if (type == B_BOOL_TYPE) {
-    return *(int8 *)g_attribute_bytes ? 1.0 : 0.0;
+  /* A typed attribute holds its value in binary, not as text, so read the
+     number back the same way `attribute set` wrote it. */
+  switch (type) {
+    case B_INT8_TYPE:
+      return (double)*(int8 *)g_attribute_bytes;
+    case B_UINT8_TYPE:
+      return (double)*(uint8 *)g_attribute_bytes;
+    case B_INT16_TYPE:
+      return (double)*(int16 *)g_attribute_bytes;
+    case B_UINT16_TYPE:
+      return (double)*(uint16 *)g_attribute_bytes;
+    case B_INT32_TYPE:
+      return (double)*(int32 *)g_attribute_bytes;
+    case B_UINT32_TYPE:
+      return (double)*(uint32 *)g_attribute_bytes;
+    case B_INT64_TYPE:
+      return (double)*(int64 *)g_attribute_bytes;
+    case B_UINT64_TYPE:
+      return (double)*(uint64 *)g_attribute_bytes;
+    case B_FLOAT_TYPE:
+      return (double)*(float *)g_attribute_bytes;
+    case B_DOUBLE_TYPE:
+      return *(double *)g_attribute_bytes;
+    case B_BOOL_TYPE:
+      return *(int8 *)g_attribute_bytes ? 1.0 : 0.0;
+    case B_TIME_TYPE: {
+      time_t when = 0;
+      memcpy(&when, g_attribute_bytes,
+             size < (int)sizeof(when) ? size : (int)sizeof(when));
+      return (double)when;
+    }
+    default:
+      break;
+  }
+  /* Text attributes hold a number written as text; the buffer has room for a
+     terminator past the bytes that were read. */
+  if (size < (int)sizeof(g_attribute_bytes)) {
+    g_attribute_bytes[size] = 0;
   }
   return atof(g_attribute_bytes);
 }
