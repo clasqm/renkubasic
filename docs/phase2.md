@@ -4,7 +4,8 @@ Phase 2 replaces yabasic's Xlib graphic window with a Haiku window and adds the
 yab compatibility layer. This document records both slices: the graphic window
 and the yab layer (`src/yabcompat/`), which runs yab's `window`, `view` and
 `draw` commands plus the widget controls, text, sliders, containers and
-`canvas`/`region`. Lists, menus, the clipboard and bitmaps are the next slices.
+`canvas`/`region` and the list family. Menus, the clipboard and bitmaps are the
+next slices.
 
 ## What exists now
 
@@ -21,7 +22,7 @@ and the yab layer (`src/yabcompat/`), which runs yab's `window`, `view` and
 | yab grammar for `window`, `view`, `draw`, `screenshot` | `src/yabasic.bison`, `src/yabasic.flex` | done |
 | yab windows, views, drawing | `src/yabcompat/rk_yab.cpp` | done for the command set below |
 | yab widget controls, text, sliders, containers, `canvas`/`region` | `src/yabcompat/rk_yab.cpp` | done; the `gui-widgets` tests run |
-| yab lists, tree/column, calendar, colour control | `src/yabcompat/` | not started; those tests ask for `gui-lists` |
+| yab lists, tree/column, calendar, colour control | `src/yabcompat/rk_yab.cpp` | done; the `gui-lists` tests run |
 | yab menus and clipboard | `src/yabcompat/` | not started; those tests ask for `gui-menus` |
 | yab bitmap | `src/yabcompat/` | not started; that test asks for `gui-bitmaps` |
 
@@ -121,7 +122,10 @@ longer three-string form, and a `+` after `textcontrol get "id"` / `textedit
 get "id"` runs the argument to the `+` (the getter takes the whole string
 expression that follows it). The count is asserted, so a future rule that adds a
 conflict makes bison fail instead of silently changing how an existing program
-parses.
+parses. The list family's string getters end in a bare expression too
+(`listbox get$ "id", n`); those states carry the lowest precedence
+(`%prec tARGUMENT`), which states the shift explicitly, so they resolve the same
+way without being counted and the asserted number stays six.
 
 **One handler, one bridge.** All the new statements compile to `cYAB*` opcodes
 and are dispatched together: `main.c` has one case group that calls
@@ -188,6 +192,20 @@ like `rk_gui_save_png()`.
   Anything else is a runtime error naming the property, not a silent no-op.
 * **`draw` covers the primitives the GUI tests use.** There is no `draw bitmap`
   and no view removal yet.
+* **The column box has no horizontal scrolling.** Haiku's `BColumnListView` is
+  a private header, so the column box is a plain `BListView` that draws its own
+  cells under its own header row; it scrolls vertically only, and a column
+  wider than the box is clipped.
+* **The calendar is drawn by hand.** Haiku has no calendar view, so
+  `YabCalendar` is a `BTextControl` with a month grid it paints itself: Monday
+  first, a click selects a day, the arrows change the month. `calendar set`
+  parses the date at fixed offsets 0/3/6 and prints it back as
+  `%02d<sep>%02d<sep>%04d`, which is what yab does.
+* **A drop box selection is 1-based.** yab's `DropBoxGetNum` returns a 0-based
+  index while every other list reports 1-based positions; RenkuBASIC returns
+  1-based for the drop box too, so `select n` and `get` agree.
+* **`treebox sort` flattens nothing.** It is `BOutlineListView`'s full-list sort
+  with level skipping, as in yab, so sorting keeps each item under its parent.
 * **Widgets are the controls, not yab's custom classes.** A `boxview` is a
   `BBox`, so it has no drawable child view of its own; tab pages are empty
   `BView`s; a split view has two panes with a fixed gap instead of a draggable
@@ -540,7 +558,54 @@ only change since. What the rerun should show: `gui-widgets : available`;
 explanation; and `g0100`, `g0101`, `g0102`, `g0103`, `g0110`, `g0111`, `g0114`,
 `g0115`, `g0119`, `g0130` and `g0131` passing.
 
-Next slice: the list controls (`listbox`, `dropbox`, `columnbox`, `treebox`,
-`calendar`, `colorcontrol`); then menus, clipboard, `bitmap` and `message$`;
-then `attribute`, widget events, and the tab/box/split polish that the gaps list
-names.
+**Round 9 (2026-11-27).** The list family: `listbox`, `dropbox`, `treebox`,
+`columnbox`, `calendar` and `colorcontrol`, with `add`, `remove`, `select`,
+`clear`, `sort`, `expand`/`collapse`, `column`, `colour` and `set` where yab has
+them, plus the getters. Notes:
+
+* yab spells its text getter `get` and its numeric one `getnum`; yabasic's
+  `get` is already a keyword here, so the text getters are `get$`
+  (`listbox get$ "id", pos`) and the numeric ones keep `get` (item count, the
+  selected position, the colour components, `columnbox count column`).
+  `textcontrol get` and `textedit get` keep the plain spelling they were
+  introduced with, and now accept `get$` as well.
+* `count` stays in the command state after a widget keyword, because
+  `columnbox count column "id"` is the one form where a second command word
+  follows; the state's fallback rule rescans anything else normally. `column`,
+  `sort`, `select`, `expand` and `collapse` are likewise keywords only there and
+  only with trailing context, so identifiers with those names keep working.
+* `treebox add "id", "parent", "item", expanded` builds a real hierarchy in a
+  `BOutlineListView`, and `get$`/`select` count the flattened list. yab's
+  five-argument `treebox add` form is left out: yab's own `graphic.c` pops only
+  three of the five arguments it pushes, so the form is broken there.
+* Haiku's `BColumnListView` lives in a private header, so the column box is a
+  `BListView` (`YabColumnList`) that draws its own cells, under a header view
+  that draws the titles. `columnbox add` sets one cell, which creates the row
+  the first time that position appears.
+* The calendar is `YabCalendar`: a text field plus a month grid it paints
+  itself, because Haiku has no calendar control. The format string only picks
+  the divider (`/`, `-`, else `.`) and month-day order when it contains `MD`,
+  exactly as yab's `graphic.c` does.
+* `colorcontrol` is a `BColorControl`, created without the size check the other
+  widgets go through, because it sizes itself from its corner.
+* The drop box reports 1-based positions, unlike yab's 0-based
+  `DropBoxGetNum`; see the gaps list.
+
+The C++ side gained one registry entry per kind and a `BView *outer`: a list or
+table can be wrapped in a `BScrollView`, and the widget entry keeps the wrapper
+for deletion while `view` stays the control the commands operate.
+
+Checked here (Linux, no app_server): the grammar regenerates with the expected
+six conflicts; all C sources plus the stub bridges build and link; `g0112`,
+`g0113` and `g0116` pass end to end against the stub, which exercises the
+keyword states, the argument popping and the `get$`/`get` split; the CLI suite
+stays at 35 / 0 / 6; and `rk_yab.cpp` passes `g++ -fsyntax-only` against Haiku's
+own public headers. That check found three API mistakes, now fixed: `BListView`
+and `BOutlineListView` take the selection type after the name, and a
+`BListItem` is selected with `Select()`/`Deselect()`, not `SetSelected()`.
+
+What the next Haiku run has to show: `gui-lists : available`, `g0112`, `g0113`
+and `g0116` passing, and the earlier GUI tests unchanged.
+
+Next slice: menus, the clipboard and `message$`; then `bitmap`, `attribute`,
+widget events, and the tab/box/split polish that the gaps list names.

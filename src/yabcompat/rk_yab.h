@@ -203,6 +203,86 @@ int rk_yab_canvas(double x1, double y1, double x2, double y2, const char *id,
 int rk_yab_region(double x1, double y1, double x2, double y2, const char *id,
                   const char *view);
 
+/* ---- list family ------------------------------------------------------ */
+
+/* yab's list boxes, drop boxes, tree boxes and column boxes share their item
+   operations: `add`, `add id, pos`, `remove id, item`, `remove id, pos`,
+   `select`, `clear`, `sort`, `count`, `get$ id, pos` and the numeric `get id`
+   for the selected position. Each call checks that the named widget is one of
+   those four and reports the wrong kind as an error. Positions are 1-based;
+   `select 0` deselects. */
+
+/* `listbox x1, y1 to x2, y2, id, bars, view`: bars 1 vertical, 2 horizontal,
+   3 both, 0 none, as in yab. */
+int rk_yab_listbox(double x1, double y1, double x2, double y2,
+                   const char *id, int bars, const char *view);
+/* `dropbox x1, y1 to x2, y2, id, label, view`; the label is the caption left
+   of the field. */
+int rk_yab_dropbox(double x1, double y1, double x2, double y2, const char *id,
+                   const char *label, const char *view);
+int rk_yab_treebox(double x1, double y1, double x2, double y2, const char *id,
+                   int bars, const char *view);
+
+int rk_yab_list_add(const char *id, const char *item);
+int rk_yab_list_add_at(const char *id, double position, const char *item);
+int rk_yab_list_remove(const char *id, const char *item);
+int rk_yab_list_remove_at(const char *id, double position);
+int rk_yab_list_select(const char *id, double position);
+int rk_yab_list_clear(const char *id);
+int rk_yab_list_sort(const char *id);
+int rk_yab_list_count(const char *id);
+const char *rk_yab_list_get(const char *id, double position);
+int rk_yab_list_selected(const char *id);
+
+/* `treebox add id, parent, item, expanded`: the item becomes a child of the
+   first item whose text is `parent`; expand/collapse name that parent too. */
+int rk_yab_tree_add_child(const char *id, const char *parent,
+                          const char *item, int expanded);
+int rk_yab_tree_remove_child(const char *id, const char *parent,
+                             const char *item);
+int rk_yab_tree_expand(const char *id, const char *item, int expand);
+
+/* `columnbox x1, y1 to x2, y2, id, hscroll, options, view`; options accepts
+   what yab's file box accepts ("no-border", "no-sorting"). */
+int rk_yab_columnbox(double x1, double y1, double x2, double y2,
+                     const char *id, int bars, const char *options,
+                     const char *view);
+/* `columnbox column id, title, position, maximum, minimum, width, options`;
+   the option is an alignment: "align-left", "align-center", "align-right". */
+int rk_yab_columnbox_column(const char *id, const char *title,
+                            double position, double maximum, double minimum,
+                            double width, const char *options);
+/* `columnbox add id, column, position, height, text`: sets one cell, creating
+   the row when the position is new. */
+int rk_yab_columnbox_add(const char *id, double column, double position,
+                         double height, const char *text);
+int rk_yab_columnbox_remove(const char *id, double position);
+int rk_yab_columnbox_remove_column(const char *id, double position);
+int rk_yab_columnbox_select(const char *id, double position);
+int rk_yab_columnbox_clear(const char *id);
+/* `columnbox colour id, option, r, g, b`: option is "background", "text",
+   "selection", "selection-text", "non-focus-selection" or "row-divider". */
+int rk_yab_columnbox_colour(const char *id, const char *option, int r, int g,
+                            int b);
+int rk_yab_columnbox_columns(const char *id);
+const char *rk_yab_columnbox_get(const char *id, double column,
+                                 double position);
+
+/* `calendar x, y, id, format, date, view`: the format is yab's date format
+   string -- its divider ("/", "-" or ""), and MM/DD order when it contains
+   "MD". The date is parsed as a date, not as a format. */
+int rk_yab_calendar(double x, double y, const char *id, const char *format,
+                    const char *date, const char *view);
+int rk_yab_calendar_set(const char *id, const char *date);
+const char *rk_yab_calendar_get(const char *id);
+
+/* `colorcontrol x, y, id, view` and `colorcontrol set id, r, g, b`. The getter
+   takes "red", "green" or "blue". */
+int rk_yab_colorcontrol(double x, double y, const char *id,
+                        const char *view);
+int rk_yab_colorcontrol_set(const char *id, int r, int g, int b);
+int rk_yab_colorcontrol_get(const char *id, const char *option);
+
 /* ---- program helpers -------------------------------------------------- */
 
 /* Write the screen area x1,y1 to x2,y2 of the frontmost yab window as PNG.

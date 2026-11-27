@@ -16,7 +16,7 @@ listbox add "rk_list", "alpha"
 listbox add "rk_list", "beta"
 listbox add "rk_list", "gamma"
 assert_eq(listbox count "rk_list", 3, "listbox count")
-item$ = listbox get "rk_list", 2
+item$ = listbox get$ "rk_list", 2
 assert_str$(item$, "beta", "listbox get second item")
 
 listbox select "rk_list", 3
@@ -30,7 +30,7 @@ dropbox add "rk_drop", "one"
 dropbox add "rk_drop", "two"
 dropbox add "rk_drop", "three"
 assert_eq(dropbox count "rk_drop", 3, "dropbox count")
-item$ = dropbox get "rk_drop", 1
+item$ = dropbox get$ "rk_drop", 1
 assert_str$(item$, "one", "dropbox get first item")
 
 dropbox select "rk_drop", 2

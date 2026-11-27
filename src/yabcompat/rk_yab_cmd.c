@@ -681,6 +681,238 @@ void rk_yab_command(struct command *cmd) {
     expect(rk_yab_region(x1, y1, x2, y2, id, view));
     break;
   }
+  /* ---- list family --------------------------------------------------- */
+  case cYABLISTBOX: {
+    char *view = take_string();
+    int bars = (int)take_number();
+    char *id = take_string();
+    double y2 = take_number();
+    double x2 = take_number();
+    double y1 = take_number();
+    double x1 = take_number();
+
+    expect(rk_yab_listbox(x1, y1, x2, y2, id, bars, view));
+    break;
+  }
+  case cYABLISTBOXADD:
+  case cYABDROPBOXADD: {
+    char *item = take_string();
+    char *id = take_string();
+
+    expect(rk_yab_list_add(id, item));
+    break;
+  }
+  case cYABLISTBOXADD2: {
+    char *item = take_string();
+    double position = take_number();
+    char *id = take_string();
+
+    expect(rk_yab_list_add_at(id, position, item));
+    break;
+  }
+  case cYABLISTBOXREMOVE:
+  case cYABTREEREMOVE: {
+    char *item = take_string();
+    char *id = take_string();
+
+    expect(rk_yab_list_remove(id, item));
+    break;
+  }
+  case cYABLISTBOXREMOVE2:
+  case cYABTREEREMOVE2:
+  case cYABDROPBOXREMOVE: {
+    double position = take_number();
+    char *id = take_string();
+
+    expect(rk_yab_list_remove_at(id, position));
+    break;
+  }
+  case cYABLISTBOXSELECT:
+  case cYABDROPBOXSELECT:
+  case cYABTREESELECT:
+  case cYABCOLUMNBOXSELECT: {
+    double position = take_number();
+    char *id = take_string();
+
+    expect(rk_yab_list_select(id, position));
+    break;
+  }
+  case cYABLISTBOXCLEAR:
+  case cYABDROPBOXCLEAR:
+  case cYABTREECLEAR:
+  case cYABCOLUMNBOXCLEAR: {
+    char *id = take_string();
+
+    expect(rk_yab_list_clear(id));
+    break;
+  }
+  case cYABLISTSORT:
+  case cYABTREESORT: {
+    char *id = take_string();
+
+    expect(rk_yab_list_sort(id));
+    break;
+  }
+  case cYABDROPBOX: {
+    char *view = take_string();
+    char *label = take_string();
+    char *id = take_string();
+    double y2 = take_number();
+    double x2 = take_number();
+    double y1 = take_number();
+    double x1 = take_number();
+
+    expect(rk_yab_dropbox(x1, y1, x2, y2, id, label, view));
+    break;
+  }
+  case cYABTREEBOX: {
+    char *view = take_string();
+    int bars = (int)take_number();
+    char *id = take_string();
+    double y2 = take_number();
+    double x2 = take_number();
+    double y1 = take_number();
+    double x1 = take_number();
+
+    expect(rk_yab_treebox(x1, y1, x2, y2, id, bars, view));
+    break;
+  }
+  case cYABTREEADD: {
+    char *item = take_string();
+    char *id = take_string();
+
+    expect(rk_yab_list_add(id, item));
+    break;
+  }
+  case cYABTREEADDCHILD: {
+    int expanded = (int)take_number();
+    char *item = take_string();
+    char *parent = take_string();
+    char *id = take_string();
+
+    expect(rk_yab_tree_add_child(id, parent, item, expanded));
+    break;
+  }
+  case cYABTREEADDAT: {
+    double position = take_number();
+    char *item = take_string();
+    char *id = take_string();
+
+    expect(rk_yab_list_add_at(id, position, item));
+    break;
+  }
+  case cYABTREEREMOVECHILD: {
+    char *item = take_string();
+    char *parent = take_string();
+    char *id = take_string();
+
+    expect(rk_yab_tree_remove_child(id, parent, item));
+    break;
+  }
+  case cYABTREEEXPAND:
+  case cYABTREECOLLAPSE: {
+    char *item = take_string();
+    char *id = take_string();
+
+    expect(rk_yab_tree_expand(id, item, cmd->type == cYABTREEEXPAND));
+    break;
+  }
+  case cYABCOLUMNBOX: {
+    char *view = take_string();
+    char *options = take_string();
+    int bars = (int)take_number();
+    char *id = take_string();
+    double y2 = take_number();
+    double x2 = take_number();
+    double y1 = take_number();
+    double x1 = take_number();
+
+    expect(rk_yab_columnbox(x1, y1, x2, y2, id, bars, options, view));
+    break;
+  }
+  case cYABCOLUMNBOXCOLUMN: {
+    char *options = take_string();
+    double width = take_number();
+    double minimum = take_number();
+    double maximum = take_number();
+    double position = take_number();
+    char *title = take_string();
+    char *id = take_string();
+
+    expect(rk_yab_columnbox_column(id, title, position, maximum, minimum,
+                                   width, options));
+    break;
+  }
+  case cYABCOLUMNBOXADD: {
+    char *text = take_string();
+    double height = take_number();
+    double position = take_number();
+    double column = take_number();
+    char *id = take_string();
+
+    expect(rk_yab_columnbox_add(id, column, position, height, text));
+    break;
+  }
+  case cYABCOLUMNBOXREMOVE: {
+    double position = take_number();
+    char *id = take_string();
+
+    expect(rk_yab_columnbox_remove(id, position));
+    break;
+  }
+  case cYABCOLUMNBOXREMOVECOLUMN: {
+    double position = take_number();
+    char *id = take_string();
+
+    expect(rk_yab_columnbox_remove_column(id, position));
+    break;
+  }
+  case cYABCOLUMNBOXCOLOUR: {
+    int b = (int)take_number();
+    int g = (int)take_number();
+    int r = (int)take_number();
+    char *option = take_string();
+    char *id = take_string();
+
+    expect(rk_yab_columnbox_colour(id, option, r, g, b));
+    break;
+  }
+  case cYABCALENDAR: {
+    char *view = take_string();
+    char *date = take_string();
+    char *format = take_string();
+    char *id = take_string();
+    double y = take_number();
+    double x = take_number();
+
+    expect(rk_yab_calendar(x, y, id, format, date, view));
+    break;
+  }
+  case cYABCALENDARSET: {
+    char *date = take_string();
+    char *id = take_string();
+
+    expect(rk_yab_calendar_set(id, date));
+    break;
+  }
+  case cYABCOLORCONTROL: {
+    char *view = take_string();
+    char *id = take_string();
+    double y = take_number();
+    double x = take_number();
+
+    expect(rk_yab_colorcontrol(x, y, id, view));
+    break;
+  }
+  case cYABCOLORCONTROLSET: {
+    int b = (int)take_number();
+    int g = (int)take_number();
+    int r = (int)take_number();
+    char *id = take_string();
+
+    expect(rk_yab_colorcontrol_set(id, r, g, b));
+    break;
+  }
   default:
     error(sERROR, "unknown yab GUI command");
     break;

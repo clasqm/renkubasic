@@ -166,6 +166,10 @@ void collect_missing_clauses(char *string, char exclude) {
 %token tBUTTON tCHECKBOX tRADIOBUTTON tTEXTCONTROL tTEXTEDIT tTEXTURL
 %token tSLIDER tSTATUSBAR tSPINCONTROL tSCROLLBAR tLAYOUT tTOOLTIP tOPTION
 %token tTABVIEW tBOXVIEW tSPLITVIEW tSTACKVIEW tCANVAS tREGION tADD tREMOVE
+/* The list family. `get$` is the string form of yab's get (tGET here) and
+   `get` is its numeric form (tGETNUM in yab, tGET here). */
+%token tLISTBOX tDROPBOX tTREEBOX tCOLUMNBOX tCALENDAR tCOLORCONTROL
+%token tCOLUMN tSORT tEXPAND tCOLLAPSE tSELECT tGETS
 
 %token tSIN tASIN tCOS tACOS tTAN tATAN tEXP tLOG
 %token tSQRT tSQR tMYEOF tABS tSIG
@@ -191,8 +195,19 @@ void collect_missing_clauses(char *string, char exclude) {
    takes the whole string expression that follows it, so a concatenation is an
    argument rather than something added to the result. The count is asserted
    here, so a new conflict makes bison fail instead of silently changing how an
-   existing program parses. */
+   existing program parses.
+
+   The list family's string getters end in a bare expression
+   (`listbox get$ "id", n`), which has the same shift reading: the position
+   argument runs on through any operator. Those states are given the lowest
+   precedence, `tARGUMENT`, so bison resolves them by shifting without counting
+   them as conflicts -- the parse is the one yab's own grammar produces, and it
+   is the one a reader expects (`a$ = listbox get$ "id", n + 1`). */
 %expect 6
+
+/* Lowest precedence of all: used only on the yab getter rules that end in an
+   argument expression, to state the shift above explicitly. */
+%precedence tARGUMENT
 
 %left tOR
 %left tAND
@@ -386,6 +401,46 @@ statement:  /* empty */
   | tSTACKVIEW tSET string_expression ',' expression {add_command(cYABSTACKVIEWSET);}
   | tCANVAS coordinates to coordinates ',' string_expression ',' string_expression {add_command(cYABCANVAS);}
   | tREGION coordinates to coordinates ',' string_expression ',' string_expression {add_command(cYABREGION);}
+/* yab's list family: list boxes, drop boxes, tree boxes, column (file) boxes,
+   the calendar control and the colour control. Positions are 1-based, exactly
+   as in yab; the creation commands take the view the control goes into. */
+  | tLISTBOX coordinates to coordinates ',' string_expression ',' expression ',' string_expression {add_command(cYABLISTBOX);}
+  | tLISTBOX tADD string_expression ',' string_expression {add_command(cYABLISTBOXADD);}
+  | tLISTBOX tADD string_expression ',' expression ',' string_expression {add_command(cYABLISTBOXADD2);}
+  | tLISTBOX tREMOVE string_expression ',' string_expression {add_command(cYABLISTBOXREMOVE);}
+  | tLISTBOX tREMOVE string_expression ',' expression {add_command(cYABLISTBOXREMOVE2);}
+  | tLISTBOX tSELECT string_expression ',' expression {add_command(cYABLISTBOXSELECT);}
+  | tLISTBOX tCLEAR string_expression {add_command(cYABLISTBOXCLEAR);}
+  | tLISTBOX tSORT string_expression {add_command(cYABLISTSORT);}
+  | tDROPBOX coordinates to coordinates ',' string_expression ',' string_expression ',' string_expression {add_command(cYABDROPBOX);}
+  | tDROPBOX tADD string_expression ',' string_expression {add_command(cYABDROPBOXADD);}
+  | tDROPBOX tSELECT string_expression ',' expression {add_command(cYABDROPBOXSELECT);}
+  | tDROPBOX tREMOVE string_expression ',' expression {add_command(cYABDROPBOXREMOVE);}
+  | tDROPBOX tCLEAR string_expression {add_command(cYABDROPBOXCLEAR);}
+  | tTREEBOX coordinates to coordinates ',' string_expression ',' expression ',' string_expression {add_command(cYABTREEBOX);}
+  | tTREEBOX tADD string_expression ',' string_expression {add_command(cYABTREEADD);}
+  | tTREEBOX tADD string_expression ',' string_expression ',' string_expression ',' expression {add_command(cYABTREEADDCHILD);}
+  | tTREEBOX tADD string_expression ',' string_expression ',' expression {add_command(cYABTREEADDAT);}
+  | tTREEBOX tREMOVE string_expression ',' string_expression {add_command(cYABTREEREMOVE);}
+  | tTREEBOX tREMOVE string_expression ',' expression {add_command(cYABTREEREMOVE2);}
+  | tTREEBOX tREMOVE string_expression ',' string_expression ',' string_expression {add_command(cYABTREEREMOVECHILD);}
+  | tTREEBOX tSELECT string_expression ',' expression {add_command(cYABTREESELECT);}
+  | tTREEBOX tCLEAR string_expression {add_command(cYABTREECLEAR);}
+  | tTREEBOX tEXPAND string_expression ',' string_expression {add_command(cYABTREEEXPAND);}
+  | tTREEBOX tCOLLAPSE string_expression ',' string_expression {add_command(cYABTREECOLLAPSE);}
+  | tTREEBOX tSORT string_expression {add_command(cYABTREESORT);}
+  | tCOLUMNBOX coordinates to coordinates ',' string_expression ',' expression ',' string_expression ',' string_expression {add_command(cYABCOLUMNBOX);}
+  | tCOLUMNBOX tCOLUMN string_expression ',' string_expression ',' expression ',' expression ',' expression ',' expression ',' string_expression {add_command(cYABCOLUMNBOXCOLUMN);}
+  | tCOLUMNBOX tADD string_expression ',' expression ',' expression ',' expression ',' string_expression {add_command(cYABCOLUMNBOXADD);}
+  | tCOLUMNBOX tREMOVE string_expression ',' expression {add_command(cYABCOLUMNBOXREMOVE);}
+  | tCOLUMNBOX tREMOVE tCOLUMN string_expression ',' expression {add_command(cYABCOLUMNBOXREMOVECOLUMN);}
+  | tCOLUMNBOX tSELECT string_expression ',' expression {add_command(cYABCOLUMNBOXSELECT);}
+  | tCOLUMNBOX tCLEAR string_expression {add_command(cYABCOLUMNBOXCLEAR);}
+  | tCOLUMNBOX tCOLOUR string_expression ',' string_expression ',' expression ',' expression ',' expression {add_command(cYABCOLUMNBOXCOLOUR);}
+  | tCALENDAR coordinates ',' string_expression ',' string_expression ',' string_expression ',' string_expression {add_command(cYABCALENDAR);}
+  | tCALENDAR tSET string_expression ',' string_expression {add_command(cYABCALENDARSET);}
+  | tCOLORCONTROL coordinates ',' string_expression ',' string_expression {add_command(cYABCOLORCONTROL);}
+  | tCOLORCONTROL tSET string_expression ',' expression ',' expression ',' expression {add_command(cYABCOLORCONTROLSET);}
   | tOPEN tPRINTER {create_openprinter(0);}
   | tOPEN tPRINTER string_expression {create_openprinter(1);}
   | tCLOSE tPRINTER {add_command(cCLOSEPRN);}
@@ -489,6 +544,16 @@ string_function: tLEFT '(' string_expression ',' expression ')' {create_function
      control or a text edit is only useful if the program can. */
   | tTEXTCONTROL tGET string_expression {create_function(fYABTEXTCONTROLGET);}
   | tTEXTEDIT tGET string_expression {create_function(fYABTEXTEDITGET);}
+  /* The list family's string getters. `get$` returns the item text; the plain
+     `get` a few lines down in big_function returns the selected position, as
+     in yab. calendar get returns the date string, so it belongs here too. */
+  | tTEXTCONTROL tGETS string_expression %prec tARGUMENT {create_function(fYABTEXTCONTROLGET);}
+  | tTEXTEDIT tGETS string_expression %prec tARGUMENT {create_function(fYABTEXTEDITGET);}
+  | tLISTBOX tGETS string_expression ',' expression %prec tARGUMENT {create_function(fYABLISTBOXGET);}
+  | tDROPBOX tGETS string_expression ',' expression %prec tARGUMENT {create_function(fYABDROPBOXGET);}
+  | tTREEBOX tGETS string_expression ',' expression %prec tARGUMENT {create_function(fYABTREEBOXGET);}
+  | tCOLUMNBOX tGETS string_expression ',' expression ',' expression %prec tARGUMENT {create_function(fYABCOLUMNBOXGET);}
+  | tCALENDAR tGET string_expression %prec tARGUMENT {create_function(fYABCALENDARGET);}
   | tPEEK2 '(' string_expression ',' string_expression ')' {create_function(fPEEK3);}
   | tTOKENALT '(' string_scalar_or_array ',' string_expression ')' {add_command(cTOKENALT2);}
   | tTOKENALT '(' string_scalar_or_array ')' {add_command(cTOKENALT);}
@@ -628,6 +693,18 @@ function: tSIN '(' expression ')' {create_function(fSIN);}
      string_function: string_function results are popped as strings. */
   | tWINDOW tCOUNT {create_function(fYABNUMWINDOWS);}
   | tWINDOW tGET string_expression ',' string_expression {create_function(fYABWINDOWGET);}
+  /* The list family's numeric getters: item counts, the selected position
+     (1-based, 0 when nothing is selected) and the colour components. */
+  | tLISTBOX tCOUNT string_expression %prec tARGUMENT {create_function(fYABLISTBOXCOUNT);}
+  | tLISTBOX tGET string_expression %prec tARGUMENT {create_function(fYABLISTBOXSELECTED);}
+  | tDROPBOX tCOUNT string_expression %prec tARGUMENT {create_function(fYABDROPBOXCOUNT);}
+  | tDROPBOX tGET string_expression %prec tARGUMENT {create_function(fYABDROPBOXSELECTED);}
+  | tTREEBOX tCOUNT string_expression %prec tARGUMENT {create_function(fYABTREEBOXCOUNT);}
+  | tTREEBOX tGET string_expression %prec tARGUMENT {create_function(fYABTREEBOXSELECTED);}
+  | tCOLUMNBOX tCOUNT string_expression %prec tARGUMENT {create_function(fYABCOLUMNBOXCOUNT);}
+  | tCOLUMNBOX tCOUNT tCOLUMN string_expression %prec tARGUMENT {create_function(fYABCOLUMNBOXCOUNTCOLUMNS);}
+  | tCOLUMNBOX tGET string_expression %prec tARGUMENT {create_function(fYABCOLUMNBOXSELECTED);}
+  | tCOLORCONTROL tGET string_expression ',' string_expression %prec tARGUMENT {create_function(fYABCOLORCONTROLGET);}
   | tDRAW tGET string_expression ',' string_expression {create_function(fYABDRAWGET);}
   | tDRAW tGET string_expression ',' string_expression ',' string_expression {create_function(fYABDRAWGETTEXT);}
   | tBFILESIZE '(' string_expression ')' {create_function(fYABBFILESIZE);}

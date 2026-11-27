@@ -27,19 +27,32 @@
       ("the window did not respond"), never a hung program and a hung test.
 */
 
+#include <Alignment.h>
 #include <Application.h>
 #include <Bitmap.h>
 #include <BitmapStream.h>
 #include <Box.h>
 #include <Button.h>
 #include <CheckBox.h>
+#include <ColorControl.h>
 #include <File.h>
 #include <Font.h>
+#include <ListItem.h>
+#include <ListView.h>
+#include <Menu.h>
+#include <MenuField.h>
+#include <MenuItem.h>
 #include <Message.h>
+#include <OutlineListView.h>
+#include <PopUpMenu.h>
 #include <RadioButton.h>
 #include <ScrollBar.h>
+#include <ScrollView.h>
+#include <SeparatorItem.h>
 #include <Slider.h>
 #include <StatusBar.h>
+#include <String.h>
+#include <StringItem.h>
 #include <StringView.h>
 #include <TabView.h>
 #include <TextControl.h>
@@ -53,6 +66,9 @@
 #include <string.h>
 #include <strings.h>
 #include <sys/stat.h>
+#include <time.h>
+
+#include <vector>
 
 #include "rk_gui.h"
 #include "yabcompat/rk_yab.h"
@@ -380,7 +396,8 @@ bool refresh_window(YabWindow *window) {
 enum YabWidgetKind {
   wkBUTTON, wkCHECKBOX, wkRADIO, wkLABEL, wkURL, wkTEXTCONTROL, wkTEXTEDIT,
   wkSLIDER, wkSPIN, wkSTATUSBAR, wkTABVIEW, wkBOXVIEW, wkSTACKVIEW,
-  wkSCROLLBAR
+  wkSCROLLBAR, wkLISTBOX, wkDROPBOX, wkTREEBOX, wkCOLUMNBOX, wkCALENDAR,
+  wkCOLORCONTROL
 };
 
 struct YabWidget {
@@ -389,6 +406,8 @@ struct YabWidget {
   YabWidgetKind kind;
   BView *view;   /* NULL for a container without a control */
   BView *extra;  /* the second scrollbar, when both were asked for */
+  BView *outer;  /* what was attached when it wraps view: a BScrollView or a
+                    container view. NULL when view itself was attached. */
   int number;    /* pages of a stack view, bars of a scrollbar */
   YabWidget *next;
 };
@@ -458,38 +477,57 @@ bool attach_widget(YabWindow *window, BView *view) {
 }
 
 /* Register a finished control. The window owns the BView once it is a child;
-   on any failure the caller still owns it and it is deleted here. */
-bool finish_widget(YabWindow *window, YabWidgetKind kind, const char *id,
-                   BView *view, int number, YabWidget **out) {
+   on any failure the caller still owns it and it is deleted here. `outer` is
+   what goes into the window when it differs from the control itself (a scroll
+   view around a list, a container around a column box); deleting it deletes
+   the control inside it. `check_frame` is 0 for controls that size themselves
+   from a corner, where the window clips rather than the command failing. */
+bool finish_widget_ex(YabWindow *window, YabWidgetKind kind, const char *id,
+                      BView *view, BView *outer, int number, int check_frame,
+                      YabWidget **out) {
+  BView *attached = outer ? outer : view;
+
   if (out) {
     *out = NULL;
   }
   if (!id || !*id) {
     set_error("a widget needs a name");
-    if (view) {
+    if (outer) {
+      delete outer;
+    } else if (view) {
       delete view;
     }
     return false;
   }
   if (find_widget(id)) {
     snprintf(g_error, sizeof(g_error), "'%s' is already a widget", id);
-    if (view) {
+    if (outer) {
+      delete outer;
+    } else if (view) {
       delete view;
     }
     return false;
   }
-  if (view) {
-    BRect frame = view->Frame();
-    if (frame.Width() < 1.0f || frame.Height() < 1.0f ||
-        frame.right > window->width - 1.0f ||
-        frame.bottom > window->height - 1.0f) {
+  if (attached) {
+    BRect frame = attached->Frame();
+    if (check_frame && (frame.Width() < 1.0f || frame.Height() < 1.0f ||
+                        frame.right > window->width - 1.0f ||
+                        frame.bottom > window->height - 1.0f)) {
       set_error("the widget does not fit into its window");
-      delete view;
+      if (outer) {
+        delete outer;
+      } else {
+        delete view;
+      }
       return false;
     }
-    view->SetResizingMode(window->resize_mode);
-    if (!attach_widget(window, view)) {
-      delete view;
+    attached->SetResizingMode(window->resize_mode);
+    if (!attach_widget(window, attached)) {
+      if (outer) {
+        delete outer;
+      } else {
+        delete view;
+      }
       return false;
     }
   }
@@ -499,6 +537,7 @@ bool finish_widget(YabWindow *window, YabWidgetKind kind, const char *id,
   widget->window = window;
   widget->kind = kind;
   widget->view = view;
+  widget->outer = outer;
   widget->extra = NULL;
   widget->number = number;
   widget->next = g_widgets;
@@ -507,6 +546,11 @@ bool finish_widget(YabWindow *window, YabWidgetKind kind, const char *id,
     *out = widget;
   }
   return true;
+}
+
+bool finish_widget(YabWindow *window, YabWidgetKind kind, const char *id,
+                   BView *view, int number, YabWidget **out) {
+  return finish_widget_ex(window, kind, id, view, NULL, number, 1, out);
 }
 
 bool lock_widget(YabWidget *widget) {
@@ -824,6 +868,624 @@ int32 window_flags_from_text(const char *text, uint32 current, char *error,
     part = comma ? comma + 1 : NULL;
   }
   return (int32)current;
+}
+
+/* ---- the list family --------------------------------------------------- */
+
+/* yab's column box (its "file box") is a table with titled columns. Haiku's
+   BColumnListView is private API, so this is a small table of its own: a header
+   view that draws the titles and a BListView whose items draw their cells.
+   Column widths are fixed, and there is no horizontal scrolling. */
+
+struct YabColumn {
+  char *title;
+  float width;
+  alignment align;
+};
+
+class YabColumnList;
+class YabColumnHeader;
+
+class YabColumnList : public BListView {
+public:
+  YabColumnList(BRect frame, const char *name)
+      : BListView(frame, name, B_SINGLE_SELECTION_LIST, B_FOLLOW_ALL,
+                  B_WILL_DRAW | B_FRAME_EVENTS | B_NAVIGABLE),
+        fHeader(NULL), fText(rgb_from(0, 0, 0)),
+        fBackground(rgb_from(255, 255, 255)),
+        fSelection(rgb_from(195, 195, 195)),
+        fSelectionText(rgb_from(0, 0, 0)), fDivider(rgb_from(160, 160, 160)) {
+    SetViewColor(fBackground);
+    SetLowColor(fBackground);
+  }
+
+  void SetHeader(YabColumnHeader *header) { fHeader = header; }
+  void AddColumn(const char *title, float width, alignment align);
+  void RemoveColumn(int index);
+  int CountColumns() const { return (int)fColumns.size(); }
+  const std::vector<YabColumn> &Columns() const { return fColumns; }
+  /* x of a column inside the view, counting a one pixel divider per column */
+  float ColumnOffset(int index) const;
+  float TotalWidth() const { return ColumnOffset(CountColumns()); }
+
+  rgb_color TextColour() const { return fText; }
+  rgb_color BackgroundColour() const { return fBackground; }
+  rgb_color SelectionColour() const { return fSelection; }
+  rgb_color SelectionTextColour() const { return fSelectionText; }
+  rgb_color DividerColour() const { return fDivider; }
+
+  void SetTextColour(rgb_color colour) {
+    fText = colour;
+    Invalidate();
+  }
+  void SetBackgroundColour(rgb_color colour) {
+    fBackground = colour;
+    SetViewColor(colour);
+    SetLowColor(colour);
+    Invalidate();
+  }
+  void SetSelectionColour(rgb_color colour) {
+    fSelection = colour;
+    Invalidate();
+  }
+  void SetSelectionTextColour(rgb_color colour) {
+    fSelectionText = colour;
+    Invalidate();
+  }
+  void SetDividerColour(rgb_color colour) {
+    fDivider = colour;
+    Invalidate();
+  }
+
+private:
+  std::vector<YabColumn> fColumns;
+  YabColumnHeader *fHeader;
+  rgb_color fText;
+  rgb_color fBackground;
+  rgb_color fSelection;
+  rgb_color fSelectionText;
+  rgb_color fDivider;
+};
+
+class YabColumnHeader : public BView {
+public:
+  YabColumnHeader(BRect frame, YabColumnList *list)
+      : BView(frame, "rk-yab-column-header", B_FOLLOW_LEFT_RIGHT, B_WILL_DRAW),
+        fList(list) {
+    SetViewColor(tint_color(ui_color(B_PANEL_BACKGROUND_COLOR), 1.04f));
+  }
+
+  void Draw(BRect update);
+
+private:
+  YabColumnList *fList;
+};
+
+class YabColumnRow : public BListItem {
+public:
+  YabColumnRow(float height) : BListItem() { SetHeight(height); }
+
+  void SetCell(int column, const char *text) {
+    if (column < 0) {
+      return;
+    }
+    while ((int)fCells.size() <= column) {
+      fCells.push_back(BString());
+    }
+    fCells[column] = text ? text : "";
+  }
+
+  const char *Cell(int column) const {
+    if (column < 0 || column >= (int)fCells.size()) {
+      return "";
+    }
+    return fCells[column].String();
+  }
+
+  void DrawItem(BView *owner, BRect frame, bool complete);
+
+private:
+  std::vector<BString> fCells;
+};
+
+void YabColumnList::AddColumn(const char *title, float width,
+                              alignment align) {
+  YabColumn column;
+
+  column.title = strdup(title ? title : "");
+  column.width = width > 8.0f ? width : 8.0f;
+  column.align = align;
+  fColumns.push_back(column);
+  Invalidate();
+  if (fHeader) {
+    fHeader->Invalidate();
+  }
+}
+
+void YabColumnList::RemoveColumn(int index) {
+  if (index < 0 || index >= (int)fColumns.size()) {
+    return;
+  }
+  free(fColumns[index].title);
+  fColumns.erase(fColumns.begin() + index);
+  for (int32 i = 0; i < CountItems(); i++) {
+    YabColumnRow *row = dynamic_cast<YabColumnRow *>(ItemAt(i));
+    if (row) {
+      /* The cells move up with their columns; the last one is left empty. */
+      for (int c = index; c < (int)fColumns.size(); c++) {
+        row->SetCell(c, row->Cell(c + 1));
+      }
+    }
+  }
+  Invalidate();
+  if (fHeader) {
+    fHeader->Invalidate();
+  }
+}
+
+float YabColumnList::ColumnOffset(int index) const {
+  float x = 0.0f;
+
+  for (int i = 0; i < index && i < (int)fColumns.size(); i++) {
+    x += fColumns[i].width + 1.0f;
+  }
+  return x;
+}
+
+void YabColumnHeader::Draw(BRect update) {
+  BRect bounds = Bounds();
+  font_height height;
+
+  SetHighColor(ViewColor());
+  FillRect(update);
+  GetFontHeight(&height);
+  SetHighColor(0, 0, 0, 255);
+  const std::vector<YabColumn> &columns = fList->Columns();
+  for (size_t i = 0; i < columns.size(); i++) {
+    float left = fList->ColumnOffset((int)i);
+    if (left > bounds.right) {
+      break;
+    }
+    BString title(columns[i].title);
+    float text_width = StringWidth(title.String());
+    float x = left + 4.0f;
+    if (columns[i].align == B_ALIGN_CENTER) {
+      x = left + (columns[i].width - text_width) / 2.0f;
+    } else if (columns[i].align == B_ALIGN_RIGHT) {
+      x = left + columns[i].width - text_width - 4.0f;
+    }
+    DrawString(title.String(), BPoint(x, height.ascent + 3.0f));
+    SetHighColor(160, 160, 160, 255);
+    StrokeLine(BPoint(left + columns[i].width, bounds.top),
+               BPoint(left + columns[i].width, bounds.bottom));
+    SetHighColor(0, 0, 0, 255);
+  }
+  SetHighColor(120, 120, 120, 255);
+  StrokeLine(BPoint(bounds.left, bounds.bottom), BPoint(bounds.right, bounds.bottom));
+}
+
+void YabColumnRow::DrawItem(BView *owner, BRect frame, bool complete) {
+  YabColumnList *list = dynamic_cast<YabColumnList *>(owner);
+
+  if (!list) {
+    BListItem::DrawItem(owner, frame, complete);
+    return;
+  }
+
+  rgb_color background =
+      IsSelected() ? list->SelectionColour() : list->BackgroundColour();
+  owner->SetLowColor(background);
+  owner->FillRect(frame, B_SOLID_LOW);
+  owner->SetHighColor(list->DividerColour());
+  owner->StrokeLine(BPoint(frame.left, frame.bottom),
+                    BPoint(frame.right, frame.bottom));
+  owner->SetHighColor(IsSelected() ? list->SelectionTextColour()
+                                  : list->TextColour());
+
+  font_height height;
+  owner->GetFontHeight(&height);
+  const std::vector<YabColumn> &columns = list->Columns();
+  for (size_t i = 0; i < columns.size(); i++) {
+    const char *text = Cell((int)i);
+    if (!text || !*text) {
+      continue;
+    }
+    float left = list->ColumnOffset((int)i) + 4.0f;
+    float width = columns[i].width - 8.0f;
+    float text_width = owner->StringWidth(text);
+    float x = left;
+
+    if (width < 1.0f) {
+      continue;
+    }
+    if (columns[i].align == B_ALIGN_CENTER) {
+      x = left + (width - text_width) / 2.0f;
+    } else if (columns[i].align == B_ALIGN_RIGHT) {
+      x = left + width - text_width;
+    }
+    owner->DrawString(text, BPoint(x, frame.top + height.ascent + 2.0f));
+  }
+}
+
+/* ---- the calendar control --------------------------------------------- */
+
+/* yab's calendar is a date field in the program's format plus a month grid.
+   The public Haiku kits have no calendar view, so the grid is drawn here: a
+   title with two arrows, the weekday initials and six weeks of day numbers.
+   Clicking a day (or editing the field) changes the date the program reads. */
+
+struct YabDateValue {
+  int day;
+  int month;
+  int year;
+};
+
+int yab_days_in_month(int year, int month) {
+  static const int days[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+
+  if (month == 2) {
+    bool leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
+    return leap ? 29 : 28;
+  }
+  if (month < 1 || month > 12) {
+    return 30;
+  }
+  return days[month - 1];
+}
+
+int yab_weekday(int year, int month, int day) /* 0 = Sunday, 1 = Monday, ... */ {
+  struct tm moment;
+
+  memset(&moment, 0, sizeof(moment));
+  moment.tm_year = year - 1900;
+  moment.tm_mon = month - 1;
+  moment.tm_mday = day;
+  if (mktime(&moment) == (time_t)-1) {
+    return 0;
+  }
+  return moment.tm_wday;
+}
+
+class YabCalendar : public BView {
+public:
+  YabCalendar(BRect frame, const char *name, const char *format,
+              const char *date);
+
+  void SetDateText(const char *date);
+  const char *DateText() const {
+    const char *text = fText ? fText->Text() : NULL;
+    return text ? text : "";
+  }
+  void MessageReceived(BMessage *message);
+  void Draw(BRect update);
+  void MouseDown(BPoint where);
+
+private:
+  void ParseDate(const char *text);
+  void FormatDate(char *buffer, size_t size) const;
+  void SyncText();
+  float TitleHeight() const { return 20.0f; }
+  float CellHeight() const;
+  float CellWidth() const;
+  BRect DayCell(int row, int column) const;
+  void ChangeMonth(int delta);
+
+  int fYear;
+  int fMonth;
+  int fDay;
+  int fOrder; /* 0 = day first, 1 = month first */
+  char fDivider;
+  bool fSyncing;
+  BTextControl *fText;
+};
+
+YabCalendar::YabCalendar(BRect frame, const char *name, const char *format,
+                         const char *date)
+    : BView(frame, name, B_FOLLOW_NONE, B_WILL_DRAW),
+      fYear(1970), fMonth(1), fDay(1), fOrder(0), fDivider('.') ,
+      fSyncing(false), fText(NULL) {
+  BString spec(format ? format : "");
+
+  if (spec.FindFirst("/") != B_ERROR) {
+    fDivider = '/';
+  } else if (spec.FindFirst("-") != B_ERROR) {
+    fDivider = '-';
+  }
+  if (spec.IFindFirst("MD") != B_ERROR) {
+    fOrder = 1;
+  }
+  SetViewColor(ui_color(B_PANEL_BACKGROUND_COLOR));
+
+  BRect field(0, 0, Bounds().Width(), 20);
+  fText = new BTextControl(field, "rk-yab-calendar-date", "", "",
+                           new BMessage('rkcd'));
+  fText->SetDivider(0.0f);
+  fText->SetModificationMessage(new BMessage('rkcd'));
+  AddChild(fText);
+
+  ParseDate(date);
+  SyncText();
+}
+
+float YabCalendar::CellHeight() const {
+  float available = Bounds().Height() - TitleHeight();
+
+  return available > 1.0f ? available / 7.0f : 1.0f;
+}
+
+float YabCalendar::CellWidth() const {
+  float width = Bounds().Width() / 7.0f;
+
+  return width > 1.0f ? width : 1.0f;
+}
+
+BRect YabCalendar::DayCell(int row, int column) const {
+  float cw = CellWidth();
+  float ch = CellHeight();
+  float top = TitleHeight() + (float)(row + 1) * ch;
+
+  return BRect((float)column * cw, top, (float)(column + 1) * cw - 1.0f,
+               top + ch - 1.0f);
+}
+
+void YabCalendar::ParseDate(const char *text) {
+  BString value(text ? text : "");
+
+  if (value.Length() >= 8) {
+    int first = atoi(value.String());
+    int second = atoi(value.String() + 3);
+    int year = atoi(value.String() + 6);
+
+    if (fOrder == 1) {
+      fMonth = first;
+      fDay = second;
+    } else {
+      fDay = first;
+      fMonth = second;
+    }
+    if (year > 0) {
+      fYear = year;
+    }
+  }
+  if (fMonth < 1 || fMonth > 12) {
+    fMonth = 1;
+  }
+  if (fDay < 1 || fDay > yab_days_in_month(fYear, fMonth)) {
+    fDay = 1;
+  }
+}
+
+void YabCalendar::FormatDate(char *buffer, size_t size) const {
+  if (fOrder == 1) {
+    snprintf(buffer, size, "%02d%c%02d%c%04d", fMonth, fDivider, fDay,
+             fDivider, fYear);
+  } else {
+    snprintf(buffer, size, "%02d%c%02d%c%04d", fDay, fDivider, fMonth,
+             fDivider, fYear);
+  }
+}
+
+void YabCalendar::SyncText() {
+  char date[32];
+
+  FormatDate(date, sizeof(date));
+  fSyncing = true;
+  fText->SetText(date);
+  fSyncing = false;
+}
+
+void YabCalendar::SetDateText(const char *date) {
+  ParseDate(date);
+  SyncText();
+  Invalidate();
+}
+
+void YabCalendar::ChangeMonth(int delta) {
+  fMonth += delta;
+  while (fMonth > 12) {
+    fMonth -= 12;
+    fYear++;
+  }
+  while (fMonth < 1) {
+    fMonth += 12;
+    fYear--;
+  }
+  int days = yab_days_in_month(fYear, fMonth);
+  if (fDay > days) {
+    fDay = days;
+  }
+  SyncText();
+  Invalidate();
+}
+
+void YabCalendar::MessageReceived(BMessage *message) {
+  if (message->what == 'rkcd') {
+    if (!fSyncing) {
+      ParseDate(fText->Text());
+      SyncText();
+      Invalidate();
+    }
+    return;
+  }
+  BView::MessageReceived(message);
+}
+
+void YabCalendar::Draw(BRect update) {
+  BRect bounds = Bounds();
+  float ch = CellHeight();
+  float cw = CellWidth();
+  int first = yab_weekday(fYear, fMonth, 1);
+  /* Monday first, as in yab's calendar. */
+  int offset = (first + 6) % 7;
+  static const char *initials[7] = {"Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"};
+  static const char *months[12] = {"January", "February", "March", "April",
+                                   "May", "June", "July", "August",
+                                   "September", "October", "November",
+                                   "December"};
+  font_height height;
+  char title[64];
+
+  GetFontHeight(&height);
+  SetHighColor(ViewColor());
+  FillRect(BRect(0, TitleHeight(), bounds.right, bounds.bottom));
+
+  /* title row: month and year, with the arrows on the right */
+  snprintf(title, sizeof(title), "%s %d",
+           months[(fMonth > 0 && fMonth <= 12) ? fMonth - 1 : 0], fYear);
+  SetHighColor(0, 0, 0, 255);
+  DrawString(title, BPoint(4.0f, TitleHeight() - 6.0f));
+  DrawString("<", BPoint(bounds.right - 32.0f, TitleHeight() - 6.0f));
+  DrawString(">", BPoint(bounds.right - 12.0f, TitleHeight() - 6.0f));
+
+  SetHighColor(96, 96, 96, 255);
+  for (int i = 0; i < 7; i++) {
+    BRect cell = DayCell(-1, i);
+    DrawString(initials[i], BPoint(cell.left + 2.0f,
+                                   cell.top + height.ascent + 1.0f));
+  }
+
+  int days = yab_days_in_month(fYear, fMonth);
+  for (int day = 1; day <= days; day++) {
+    int slot = offset + day - 1;
+    int row = slot / 7;
+    int column = slot % 7;
+
+    if (row > 5) {
+      break;
+    }
+    BRect cell = DayCell(row, column);
+    char number[8];
+
+    snprintf(number, sizeof(number), "%d", day);
+    if (day == fDay) {
+      BRect highlight = cell;
+      highlight.InsetBySelf(1.0f, 1.0f);
+      SetHighColor(90, 130, 200, 255);
+      FillRect(highlight);
+      SetHighColor(255, 255, 255, 255);
+    } else {
+      SetHighColor(0, 0, 0, 255);
+    }
+    float text_width = StringWidth(number);
+    DrawString(number, BPoint(cell.left + (cw - text_width) / 2.0f,
+                              cell.top + height.ascent + 1.0f));
+  }
+
+  SetHighColor(200, 200, 200, 255);
+  StrokeRect(BRect(0, TitleHeight(), bounds.right, bounds.bottom));
+}
+
+void YabCalendar::MouseDown(BPoint where) {
+  float ch = CellHeight();
+
+  if (where.y < TitleHeight()) {
+    return;
+  }
+  if (where.y < TitleHeight() + ch) {
+    if (where.x > Bounds().right - 24.0f) {
+      ChangeMonth(1);
+    } else if (where.x > Bounds().right - 44.0f) {
+      ChangeMonth(-1);
+    }
+    return;
+  }
+
+  int row = (int)((where.y - TitleHeight()) / ch) - 1;
+  int column = (int)(where.x / CellWidth());
+  int first = yab_weekday(fYear, fMonth, 1);
+  int offset = (first + 6) % 7;
+  int day = row * 7 + column - offset + 1;
+
+  if (row < 0 || row > 5 || column < 0 || column > 6) {
+    return;
+  }
+  if (day < 1 || day > yab_days_in_month(fYear, fMonth)) {
+    return;
+  }
+  fDay = day;
+  SyncText();
+  Invalidate();
+}
+
+/* ---- list family helpers ---------------------------------------------- */
+
+/* The list boxes, drop boxes, tree boxes and column boxes share their item
+   commands, so one lookup covers all four and the caller switches on the kind.
+   "get" and "sort" name the missing command in the error. */
+YabWidget *find_list_widget(const char *id, const char *command) {
+  YabWidget *widget = find_widget(id);
+
+  if (!widget) {
+    snprintf(g_error, sizeof(g_error), "%s: '%s' is not open", command,
+             id ? id : "");
+    return NULL;
+  }
+  if (widget->kind != wkLISTBOX && widget->kind != wkDROPBOX &&
+      widget->kind != wkTREEBOX && widget->kind != wkCOLUMNBOX) {
+    snprintf(g_error, sizeof(g_error), "%s: '%s' is not a list control",
+             command, id ? id : "");
+    return NULL;
+  }
+  return widget;
+}
+
+BMenu *dropbox_menu(YabWidget *widget) {
+  BMenuField *field = dynamic_cast<BMenuField *>(widget->view);
+
+  return field ? field->Menu() : NULL;
+}
+
+YabColumnList *column_list(YabWidget *widget) {
+  return dynamic_cast<YabColumnList *>(widget->view);
+}
+
+/* Two sort comparators, because BListView::SortItems takes void pointers and
+   BOutlineListView::FullListSortItems takes BListItem pointers. Both sort by
+   text, ignoring case, as yab's compare does; a tree also keeps each level on
+   its own, so children never jump over a parent. */
+int compare_list_items(const void *first, const void *second) {
+  const BStringItem *a = *(const BStringItem *const *)first;
+  const BStringItem *b = *(const BStringItem *const *)second;
+
+  if (!a || !b) {
+    return 0;
+  }
+  return strcasecmp(a->Text(), b->Text());
+}
+
+int compare_tree_items(const BListItem *first, const BListItem *second) {
+  const BStringItem *a = dynamic_cast<const BStringItem *>(first);
+  const BStringItem *b = dynamic_cast<const BStringItem *>(second);
+
+  if (!a || !b) {
+    return 0;
+  }
+  if (a->OutlineLevel() != b->OutlineLevel()) {
+    return 0;
+  }
+  return strcasecmp(a->Text(), b->Text());
+}
+
+/* BScrollView around a list: yab's `scrollbar` argument, 0 none, 1 vertical,
+   2 horizontal, 3 both. The list is shrunk first so the bars fit inside the
+   rectangle the program asked for. */
+BView *wrap_list_in_scroll(BListView *list, int bars) {
+  if (bars <= 0) {
+    return NULL;
+  }
+  BRect frame = list->Frame();
+
+  if (bars == 1 || bars == 3) {
+    frame.right -= B_V_SCROLL_BAR_WIDTH;
+    list->ResizeTo(frame.Width() + 1.0f, list->Bounds().Height());
+  }
+  if (bars == 2 || bars == 3) {
+    frame.bottom -= B_H_SCROLL_BAR_HEIGHT;
+    list->ResizeTo(list->Bounds().Width(), frame.Height() + 1.0f);
+  }
+  return new BScrollView("rk-yab-scroll", list, B_FOLLOW_NONE,
+                         B_WILL_DRAW | B_FULL_UPDATE_ON_RESIZE, bars == 2 || bars == 3,
+                         bars != 2);
 }
 
 } // namespace
@@ -2485,6 +3147,1054 @@ int rk_yab_region(double x1, double y1, double x2, double y2, const char *id,
     return 0;
   }
   return refresh_window(window) ? 1 : 0;
+}
+
+/* ---- list family ------------------------------------------------------- */
+
+int rk_yab_listbox(double x1, double y1, double x2, double y2,
+                   const char *id, int bars, const char *view_name) {
+  clear_error();
+  float dx = 0.0f;
+  float dy = 0.0f;
+  YabWindow *window = widget_host(view_name, &dx, &dy);
+
+  if (!window) {
+    return 0;
+  }
+  BListView *list = new BListView(
+      BRect((float)x1 + dx, (float)y1 + dy, (float)x2 + dx, (float)y2 + dy),
+      id ? id : "", B_SINGLE_SELECTION_LIST, B_FOLLOW_NONE,
+      B_WILL_DRAW | B_FULL_UPDATE_ON_RESIZE | B_NAVIGABLE);
+  list->SetSelectionMessage(new BMessage('rkls'));
+  BView *scroll = wrap_list_in_scroll(list, bars);
+
+  return finish_widget_ex(window, wkLISTBOX, id, list, scroll, 0, 1, NULL) ? 1
+                                                                        : 0;
+}
+
+int rk_yab_dropbox(double x1, double y1, double x2, double y2, const char *id,
+                   const char *label, const char *view_name) {
+  clear_error();
+  float dx = 0.0f;
+  float dy = 0.0f;
+  YabWindow *window = widget_host(view_name, &dx, &dy);
+
+  if (!window) {
+    return 0;
+  }
+  BPopUpMenu *menu = new BPopUpMenu("");
+  BMenuField *field = new BMenuField(
+      BRect((float)x1 + dx, (float)y1 + dy, (float)x2 + dx, (float)y2 + dy),
+      id ? id : "", label ? label : "", menu, true);
+
+  return finish_widget(window, wkDROPBOX, id, field, 0, NULL) ? 1 : 0;
+}
+
+int rk_yab_treebox(double x1, double y1, double x2, double y2, const char *id,
+                   int bars, const char *view_name) {
+  clear_error();
+  float dx = 0.0f;
+  float dy = 0.0f;
+  YabWindow *window = widget_host(view_name, &dx, &dy);
+
+  if (!window) {
+    return 0;
+  }
+  BOutlineListView *tree = new BOutlineListView(
+      BRect((float)x1 + dx, (float)y1 + dy, (float)x2 + dx, (float)y2 + dy),
+      id ? id : "", B_SINGLE_SELECTION_LIST, B_FOLLOW_NONE,
+      B_WILL_DRAW | B_FULL_UPDATE_ON_RESIZE | B_NAVIGABLE);
+  tree->SetSelectionMessage(new BMessage('rkts'));
+  BView *scroll = wrap_list_in_scroll(tree, bars);
+
+  return finish_widget_ex(window, wkTREEBOX, id, tree, scroll, 0, 1, NULL) ? 1
+                                                                        : 0;
+}
+
+int rk_yab_columnbox(double x1, double y1, double x2, double y2,
+                     const char *id, int bars, const char *options,
+                     const char *view_name) {
+  clear_error();
+  float dx = 0.0f;
+  float dy = 0.0f;
+  YabWindow *window = widget_host(view_name, &dx, &dy);
+  BRect frame((float)x1 + dx, (float)y1 + dy, (float)x2 + dx, (float)y2 + dy);
+  const float header_height = 19.0f;
+
+  (void)bars;    /* the table scrolls vertically inside its own list */
+  (void)options; /* "no-border"/"no-sorting" only affect yab's own table */
+  if (!window) {
+    return 0;
+  }
+  YabColumnList *list = new YabColumnList(
+      BRect(0, header_height + 1.0f, frame.Width(), frame.Height()),
+      "rk-yab-columns");
+  YabColumnHeader *header =
+      new YabColumnHeader(BRect(0, 0, frame.Width(), header_height), list);
+  BView *box = new BView(frame, "rk-yab-columnbox", B_FOLLOW_NONE, B_WILL_DRAW);
+
+  list->SetHeader(header);
+  list->SetSelectionMessage(new BMessage('rkcs'));
+  box->AddChild(header);
+  box->AddChild(list);
+  return finish_widget_ex(window, wkCOLUMNBOX, id, list, box, 0, 1, NULL) ? 1
+                                                                       : 0;
+}
+
+int rk_yab_list_add(const char *id, const char *item) {
+  clear_error();
+  YabWidget *widget = find_list_widget(id, "add");
+  int ok = 0;
+
+  if (!widget || !lock_widget(widget)) {
+    return 0;
+  }
+  switch (widget->kind) {
+  case wkLISTBOX:
+  case wkTREEBOX:
+    ((BListView *)widget->view)->AddItem(new BStringItem(item ? item : ""));
+    ok = 1;
+    break;
+  case wkDROPBOX: {
+    BMenu *menu = dropbox_menu(widget);
+    if (menu) {
+      if (item && strcmp(item, "--") == 0) {
+        menu->AddItem(new BSeparatorItem());
+        ok = 1;
+      } else {
+        BMenuItem *entry = new BMenuItem(item ? item : "", new BMessage('rkdb'));
+        menu->AddItem(entry);
+        if (menu->CountItems() == 1) {
+          entry->SetMarked(true);
+        }
+        ok = 1;
+      }
+    }
+    break;
+  }
+  default:
+    break;
+  }
+  widget->window->window->Unlock();
+  if (!ok) {
+    snprintf(g_error, sizeof(g_error), "add: '%s' cannot take items",
+             id ? id : "");
+    return 0;
+  }
+  return 1;
+}
+
+int rk_yab_list_add_at(const char *id, double position, const char *item) {
+  clear_error();
+  YabWidget *widget = find_list_widget(id, "add");
+  int32 index = (int32)position - 1;
+  int ok = 0;
+
+  if (!widget || !lock_widget(widget)) {
+    return 0;
+  }
+  if (index < 0) {
+    index = 0;
+  }
+  switch (widget->kind) {
+  case wkLISTBOX:
+  case wkTREEBOX: {
+    BListView *list = (BListView *)widget->view;
+    BStringItem *entry = new BStringItem(item ? item : "");
+    if (index >= list->CountItems()) {
+      list->AddItem(entry);
+    } else {
+      /* A tree keeps the outline level of the item it is inserted before. */
+      BOutlineListView *tree = dynamic_cast<BOutlineListView *>(list);
+      if (tree) {
+        BListItem *before = tree->FullListItemAt(index);
+        if (before) {
+          entry->SetOutlineLevel(before->OutlineLevel());
+        }
+      }
+      list->AddItem(entry, index);
+    }
+    ok = 1;
+    break;
+  }
+  default:
+    break;
+  }
+  widget->window->window->Unlock();
+  if (!ok) {
+    snprintf(g_error, sizeof(g_error), "add: '%s' takes no position",
+             id ? id : "");
+    return 0;
+  }
+  return 1;
+}
+
+int rk_yab_list_remove(const char *id, const char *item) {
+  clear_error();
+  YabWidget *widget = find_list_widget(id, "remove");
+  const char *text = item ? item : "";
+  int ok = 0;
+
+  if (!widget || !lock_widget(widget)) {
+    return 0;
+  }
+  switch (widget->kind) {
+  case wkLISTBOX: {
+    BListView *list = (BListView *)widget->view;
+    for (int32 i = 0; i < list->CountItems() && !ok; i++) {
+      BStringItem *entry = dynamic_cast<BStringItem *>(list->ItemAt(i));
+      if (entry && strcmp(entry->Text(), text) == 0) {
+        delete list->RemoveItem(i);
+        ok = 1;
+      }
+    }
+    break;
+  }
+  case wkTREEBOX: {
+    BOutlineListView *tree = (BOutlineListView *)widget->view;
+    for (int32 i = 0; i < tree->FullListCountItems() && !ok; i++) {
+      BStringItem *entry =
+          dynamic_cast<BStringItem *>(tree->FullListItemAt(i));
+      if (entry && strcmp(entry->Text(), text) == 0) {
+        tree->RemoveItem(entry);
+        delete entry;
+        ok = 1;
+      }
+    }
+    break;
+  }
+  case wkDROPBOX: {
+    BMenu *menu = dropbox_menu(widget);
+    for (int32 i = 0; menu && i < menu->CountItems() && !ok; i++) {
+      BMenuItem *entry = menu->ItemAt(i);
+      if (entry && entry->Label() && strcmp(entry->Label(), text) == 0) {
+        delete menu->RemoveItem(i);
+        ok = 1;
+      }
+    }
+    break;
+  }
+  default:
+    break;
+  }
+  widget->window->window->Unlock();
+  if (!ok) {
+    snprintf(g_error, sizeof(g_error), "remove: '%s' has no item '%s'",
+             id ? id : "", text);
+    return 0;
+  }
+  return 1;
+}
+
+int rk_yab_list_remove_at(const char *id, double position) {
+  clear_error();
+  YabWidget *widget = find_list_widget(id, "remove");
+  int32 index = (int32)position - 1;
+  int ok = 0;
+
+  if (!widget || !lock_widget(widget)) {
+    return 0;
+  }
+  switch (widget->kind) {
+  case wkLISTBOX: {
+    BListView *list = (BListView *)widget->view;
+    if (index >= 0 && index < list->CountItems()) {
+      delete list->RemoveItem(index);
+      ok = 1;
+    }
+    break;
+  }
+  case wkTREEBOX: {
+    BOutlineListView *tree = (BOutlineListView *)widget->view;
+    BListItem *entry =
+        index >= 0 ? tree->FullListItemAt(index) : (BListItem *)NULL;
+    if (entry) {
+      tree->RemoveItem(entry);
+      delete entry;
+      ok = 1;
+    }
+    break;
+  }
+  case wkDROPBOX: {
+    BMenu *menu = dropbox_menu(widget);
+    if (menu && index >= 0 && index < menu->CountItems()) {
+      delete menu->RemoveItem(index);
+      ok = 1;
+    }
+    break;
+  }
+  case wkCOLUMNBOX: {
+    YabColumnList *list = column_list(widget);
+    if (list && index >= 0 && index < list->CountItems()) {
+      delete list->RemoveItem(index);
+      list->Invalidate();
+      ok = 1;
+    }
+    break;
+  }
+  default:
+    break;
+  }
+  widget->window->window->Unlock();
+  if (!ok) {
+    snprintf(g_error, sizeof(g_error), "remove: '%s' has no item %d",
+             id ? id : "", (int)position);
+    return 0;
+  }
+  return 1;
+}
+
+int rk_yab_list_select(const char *id, double position) {
+  clear_error();
+  YabWidget *widget = find_list_widget(id, "select");
+  int32 index = (int32)position - 1;
+  int ok = 0;
+
+  if (!widget || !lock_widget(widget)) {
+    return 0;
+  }
+  switch (widget->kind) {
+  case wkLISTBOX: {
+    BListView *list = (BListView *)widget->view;
+    if (index < 0) {
+      list->DeselectAll();
+      ok = 1;
+    } else if (index < list->CountItems()) {
+      list->Select(index);
+      list->ScrollToSelection();
+      ok = 1;
+    }
+    break;
+  }
+  case wkTREEBOX: {
+    BOutlineListView *tree = (BOutlineListView *)widget->view;
+    if (index < 0) {
+      tree->DeselectAll();
+      ok = 1;
+    } else {
+      BListItem *entry = tree->FullListItemAt(index);
+      if (entry) {
+        tree->DeselectAll();
+        entry->Select();
+        tree->ScrollTo(tree->FullListIndexOf(entry));
+        ok = 1;
+      }
+    }
+    break;
+  }
+  case wkDROPBOX: {
+    BMenu *menu = dropbox_menu(widget);
+    for (int32 i = 0; menu && i < menu->CountItems(); i++) {
+      BMenuItem *entry = menu->ItemAt(i);
+      if (entry) {
+        entry->SetMarked(i == index);
+      }
+    }
+    ok = menu != NULL && menu->CountItems() > 0;
+    break;
+  }
+  case wkCOLUMNBOX: {
+    YabColumnList *list = column_list(widget);
+    if (list) {
+      if (index < 0) {
+        list->DeselectAll();
+        ok = 1;
+      } else {
+        if (index < list->CountItems()) {
+          list->Select(index);
+          list->ScrollToSelection();
+          ok = 1;
+        }
+      }
+    }
+    break;
+  }
+  default:
+    break;
+  }
+  widget->window->window->Unlock();
+  if (!ok) {
+    snprintf(g_error, sizeof(g_error), "select: '%s' has no item %d",
+             id ? id : "", (int)position);
+    return 0;
+  }
+  return 1;
+}
+
+int rk_yab_list_clear(const char *id) {
+  clear_error();
+  YabWidget *widget = find_list_widget(id, "clear");
+  int ok = 0;
+
+  if (!widget || !lock_widget(widget)) {
+    return 0;
+  }
+  switch (widget->kind) {
+  case wkLISTBOX: {
+    BListView *list = (BListView *)widget->view;
+    while (list->CountItems() > 0) {
+      delete list->RemoveItem((int32)0);
+    }
+    ok = 1;
+    break;
+  }
+  case wkTREEBOX:
+    ((BOutlineListView *)widget->view)->MakeEmpty();
+    ok = 1;
+    break;
+  case wkDROPBOX: {
+    BMenu *menu = dropbox_menu(widget);
+    while (menu && menu->CountItems() > 0) {
+      delete menu->RemoveItem((int32)0);
+    }
+    ok = menu != NULL;
+    break;
+  }
+  case wkCOLUMNBOX: {
+    YabColumnList *list = column_list(widget);
+    while (list && list->CountItems() > 0) {
+      delete list->RemoveItem((int32)0);
+    }
+    if (list) {
+      list->Invalidate();
+      ok = 1;
+    }
+    break;
+  }
+  default:
+    break;
+  }
+  widget->window->window->Unlock();
+  if (!ok) {
+    snprintf(g_error, sizeof(g_error), "clear: '%s' cannot be cleared",
+             id ? id : "");
+    return 0;
+  }
+  return 1;
+}
+
+int rk_yab_list_sort(const char *id) {
+  clear_error();
+  YabWidget *widget = find_list_widget(id, "sort");
+  int ok = 0;
+
+  if (!widget || !lock_widget(widget)) {
+    return 0;
+  }
+  switch (widget->kind) {
+  case wkLISTBOX:
+    ((BListView *)widget->view)->SortItems(compare_list_items);
+    ok = 1;
+    break;
+  case wkTREEBOX:
+    ((BOutlineListView *)widget->view)->FullListSortItems(compare_tree_items);
+    ok = 1;
+    break;
+  default:
+    break;
+  }
+  widget->window->window->Unlock();
+  if (!ok) {
+    snprintf(g_error, sizeof(g_error), "sort: '%s' cannot be sorted",
+             id ? id : "");
+    return 0;
+  }
+  return 1;
+}
+
+int rk_yab_list_count(const char *id) {
+  clear_error();
+  YabWidget *widget = find_list_widget(id, "count");
+  int count = 0;
+
+  if (!widget || !lock_widget(widget)) {
+    return 0;
+  }
+  switch (widget->kind) {
+  case wkLISTBOX:
+    count = (int)((BListView *)widget->view)->CountItems();
+    break;
+  case wkTREEBOX:
+    count = (int)((BOutlineListView *)widget->view)->FullListCountItems();
+    break;
+  case wkDROPBOX: {
+    BMenu *menu = dropbox_menu(widget);
+    count = menu ? (int)menu->CountItems() : 0;
+    break;
+  }
+  case wkCOLUMNBOX: {
+    YabColumnList *list = column_list(widget);
+    count = list ? (int)list->CountItems() : 0;
+    break;
+  }
+  default:
+    break;
+  }
+  widget->window->window->Unlock();
+  return count;
+}
+
+const char *rk_yab_list_get(const char *id, double position) {
+  clear_error();
+  YabWidget *widget = find_list_widget(id, "get");
+  int32 index = (int32)position - 1;
+  const char *result = "";
+
+  if (!widget || !lock_widget(widget)) {
+    return "";
+  }
+  switch (widget->kind) {
+  case wkLISTBOX: {
+    BStringItem *entry = dynamic_cast<BStringItem *>(
+        ((BListView *)widget->view)->ItemAt(index));
+    if (entry) {
+      result = entry->Text();
+    }
+    break;
+  }
+  case wkTREEBOX: {
+    BStringItem *entry = dynamic_cast<BStringItem *>(
+        ((BOutlineListView *)widget->view)->FullListItemAt(index));
+    if (entry) {
+      result = entry->Text();
+    }
+    break;
+  }
+  case wkDROPBOX: {
+    BMenu *menu = dropbox_menu(widget);
+    BMenuItem *entry = menu ? menu->ItemAt(index) : NULL;
+    if (entry) {
+      result = entry->Label();
+    }
+    break;
+  }
+  default:
+    break;
+  }
+  /* Copy before unlocking: the control may change its items at any time. */
+  static char text[1024];
+  bool found = result && *result;
+
+  snprintf(text, sizeof(text), "%s", result ? result : "");
+  widget->window->window->Unlock();
+  if (!found) {
+    snprintf(g_error, sizeof(g_error), "get: '%s' has no item %d", id ? id : "",
+             (int)position);
+    return "";
+  }
+  return text;
+}
+
+int rk_yab_list_selected(const char *id) {
+  clear_error();
+  YabWidget *widget = find_list_widget(id, "get");
+  int selected = 0;
+
+  if (!widget || !lock_widget(widget)) {
+    return 0;
+  }
+  switch (widget->kind) {
+  case wkLISTBOX: {
+    int32 index = ((BListView *)widget->view)->CurrentSelection();
+    selected = index >= 0 ? (int)index + 1 : 0;
+    break;
+  }
+  case wkTREEBOX: {
+    int32 index = ((BOutlineListView *)widget->view)->FullListCurrentSelection();
+    selected = index >= 0 ? (int)index + 1 : 0;
+    break;
+  }
+  case wkDROPBOX: {
+    BMenu *menu = dropbox_menu(widget);
+    int32 index = menu ? menu->IndexOf(menu->FindMarked()) : -1;
+    selected = index >= 0 ? (int)index + 1 : 0;
+    break;
+  }
+  case wkCOLUMNBOX: {
+    YabColumnList *list = column_list(widget);
+    for (int32 i = 0; list && i < list->CountItems(); i++) {
+      if (list->ItemAt(i) && list->ItemAt(i)->IsSelected()) {
+        selected = (int)i + 1;
+        break;
+      }
+    }
+    break;
+  }
+  default:
+    break;
+  }
+  widget->window->window->Unlock();
+  return selected;
+}
+
+int rk_yab_tree_add_child(const char *id, const char *parent,
+                          const char *item, int expanded) {
+  clear_error();
+  YabWidget *widget = find_widget(id);
+  int ok = 0;
+
+  if (!widget || widget->kind != wkTREEBOX) {
+    snprintf(g_error, sizeof(g_error),
+             "treebox add: '%s' is not a tree box", id ? id : "");
+    return 0;
+  }
+  if (!lock_widget(widget)) {
+    return 0;
+  }
+  BOutlineListView *tree = (BOutlineListView *)widget->view;
+  for (int32 i = 0; i < tree->FullListCountItems() && !ok; i++) {
+    BStringItem *head = dynamic_cast<BStringItem *>(tree->FullListItemAt(i));
+    if (head && strcmp(head->Text(), parent ? parent : "") == 0) {
+      int32 level = (int32)head->OutlineLevel() + 1;
+      int32 under = tree->CountItemsUnder(head, false);
+      BStringItem *child = new BStringItem(item ? item : "", level);
+
+      tree->AddItem(child, i + under + 1);
+      if (!expanded) {
+        tree->Collapse(head);
+      }
+      ok = 1;
+    }
+  }
+  widget->window->window->Unlock();
+  if (!ok) {
+    snprintf(g_error, sizeof(g_error), "treebox add: '%s' has no item '%s'",
+             id ? id : "", parent ? parent : "");
+    return 0;
+  }
+  return 1;
+}
+
+int rk_yab_tree_remove_child(const char *id, const char *parent,
+                             const char *item) {
+  clear_error();
+  YabWidget *widget = find_widget(id);
+  int ok = 0;
+
+  if (!widget || widget->kind != wkTREEBOX) {
+    snprintf(g_error, sizeof(g_error),
+             "treebox remove: '%s' is not a tree box", id ? id : "");
+    return 0;
+  }
+  if (!lock_widget(widget)) {
+    return 0;
+  }
+  BOutlineListView *tree = (BOutlineListView *)widget->view;
+  for (int32 i = 0; i < tree->FullListCountItems() && !ok; i++) {
+    BStringItem *head = dynamic_cast<BStringItem *>(tree->FullListItemAt(i));
+    if (!head || strcmp(head->Text(), parent ? parent : "") != 0) {
+      continue;
+    }
+    int32 under = tree->CountItemsUnder(head, false);
+    for (int32 j = 1; j <= under && !ok; j++) {
+      BStringItem *child =
+          dynamic_cast<BStringItem *>(tree->FullListItemAt(i + j));
+      if (child && strcmp(child->Text(), item ? item : "") == 0) {
+        tree->RemoveItem(child);
+        delete child;
+        ok = 1;
+      }
+    }
+  }
+  widget->window->window->Unlock();
+  if (!ok) {
+    snprintf(g_error, sizeof(g_error),
+             "treebox remove: '%s' has no child '%s' under '%s'", id ? id : "",
+             item ? item : "", parent ? parent : "");
+    return 0;
+  }
+  return 1;
+}
+
+int rk_yab_tree_expand(const char *id, const char *item, int expand) {
+  clear_error();
+  YabWidget *widget = find_widget(id);
+  int ok = 0;
+
+  if (!widget || widget->kind != wkTREEBOX) {
+    snprintf(g_error, sizeof(g_error),
+             "treebox: '%s' is not a tree box", id ? id : "");
+    return 0;
+  }
+  if (!lock_widget(widget)) {
+    return 0;
+  }
+  BOutlineListView *tree = (BOutlineListView *)widget->view;
+  for (int32 i = 0; i < tree->FullListCountItems() && !ok; i++) {
+    BStringItem *head = dynamic_cast<BStringItem *>(tree->FullListItemAt(i));
+    if (head && strcmp(head->Text(), item ? item : "") == 0) {
+      if (expand) {
+        tree->Expand(head);
+      } else {
+        tree->Collapse(head);
+      }
+      ok = 1;
+    }
+  }
+  widget->window->window->Unlock();
+  if (!ok) {
+    snprintf(g_error, sizeof(g_error), "treebox: '%s' has no item '%s'",
+             id ? id : "", item ? item : "");
+    return 0;
+  }
+  return 1;
+}
+
+int rk_yab_columnbox_column(const char *id, const char *title,
+                            double position, double maximum, double minimum,
+                            double width, const char *options) {
+  clear_error();
+  YabWidget *widget = find_widget(id);
+  alignment align = B_ALIGN_LEFT;
+
+  (void)maximum;
+  (void)minimum;
+  if (!widget || widget->kind != wkCOLUMNBOX) {
+    snprintf(g_error, sizeof(g_error),
+             "columnbox column: '%s' is not a column box", id ? id : "");
+    return 0;
+  }
+  if (options) {
+    if (strstr(options, "center")) {
+      align = B_ALIGN_CENTER;
+    } else if (strstr(options, "right")) {
+      align = B_ALIGN_RIGHT;
+    }
+  }
+  if (!lock_widget(widget)) {
+    return 0;
+  }
+  YabColumnList *list = column_list(widget);
+
+  (void)position; /* a column is added to the right, as yab's table does */
+  if (list) {
+    list->AddColumn(title, (float)width, align);
+  }
+  widget->window->window->Unlock();
+  return list ? 1 : 0;
+}
+
+int rk_yab_columnbox_add(const char *id, double column, double position,
+                         double height, const char *text) {
+  clear_error();
+  YabWidget *widget = find_widget(id);
+  int ok = 0;
+
+  if (!widget || widget->kind != wkCOLUMNBOX) {
+    snprintf(g_error, sizeof(g_error),
+             "columnbox add: '%s' is not a column box", id ? id : "");
+    return 0;
+  }
+  if (!lock_widget(widget)) {
+    return 0;
+  }
+  YabColumnList *list = column_list(widget);
+  int32 index = (int32)position - 1;
+  int32 cell = (int32)column - 1;
+
+  if (list && index >= 0 && cell >= 0) {
+    YabColumnRow *row = dynamic_cast<YabColumnRow *>(list->ItemAt(index));
+    if (!row) {
+      row = new YabColumnRow(height > 1.0 ? (float)height : 20.0f);
+      list->AddItem(row, index);
+    }
+    row->SetCell((int)cell, text);
+    list->Invalidate();
+    ok = 1;
+  }
+  widget->window->window->Unlock();
+  if (!ok) {
+    snprintf(g_error, sizeof(g_error),
+             "columnbox add: '%s' has no column %d at row %d", id ? id : "",
+             (int)column, (int)position);
+    return 0;
+  }
+  return 1;
+}
+
+int rk_yab_columnbox_remove(const char *id, double position) {
+  return rk_yab_list_remove_at(id, position);
+}
+
+int rk_yab_columnbox_remove_column(const char *id, double position) {
+  clear_error();
+  YabWidget *widget = find_widget(id);
+  int ok = 0;
+
+  if (!widget || widget->kind != wkCOLUMNBOX) {
+    snprintf(g_error, sizeof(g_error),
+             "columnbox remove column: '%s' is not a column box",
+             id ? id : "");
+    return 0;
+  }
+  if (!lock_widget(widget)) {
+    return 0;
+  }
+  YabColumnList *list = column_list(widget);
+  int32 index = (int32)position - 1;
+
+  if (list && index >= 0 && index < list->CountColumns()) {
+    list->RemoveColumn(index);
+    ok = 1;
+  }
+  widget->window->window->Unlock();
+  if (!ok) {
+    snprintf(g_error, sizeof(g_error),
+             "columnbox remove column: '%s' has no column %d", id ? id : "",
+             (int)position);
+    return 0;
+  }
+  return 1;
+}
+
+int rk_yab_columnbox_select(const char *id, double position) {
+  return rk_yab_list_select(id, position);
+}
+
+int rk_yab_columnbox_clear(const char *id) {
+  return rk_yab_list_clear(id);
+}
+
+int rk_yab_columnbox_colour(const char *id, const char *option, int r, int g,
+                            int b) {
+  clear_error();
+  YabWidget *widget = find_widget(id);
+  int ok = 0;
+
+  if (!widget || widget->kind != wkCOLUMNBOX) {
+    snprintf(g_error, sizeof(g_error),
+             "columnbox colour: '%s' is not a column box", id ? id : "");
+    return 0;
+  }
+  if (!option) {
+    set_error("columnbox colour: an option is needed");
+    return 0;
+  }
+  if (!lock_widget(widget)) {
+    return 0;
+  }
+  YabColumnList *list = column_list(widget);
+
+  if (list) {
+    if (strcmp(option, "background") == 0) {
+      list->SetBackgroundColour(rgb_from(r, g, b));
+      ok = 1;
+    } else if (strcmp(option, "text") == 0) {
+      list->SetTextColour(rgb_from(r, g, b));
+      ok = 1;
+    } else if (strcmp(option, "selection") == 0 ||
+               strcmp(option, "non-focus-selection") == 0) {
+      list->SetSelectionColour(rgb_from(r, g, b));
+      ok = 1;
+    } else if (strcmp(option, "selection-text") == 0) {
+      list->SetSelectionTextColour(rgb_from(r, g, b));
+      ok = 1;
+    } else if (strcmp(option, "row-divider") == 0) {
+      list->SetDividerColour(rgb_from(r, g, b));
+      ok = 1;
+    }
+  }
+  widget->window->window->Unlock();
+  if (!ok) {
+    snprintf(g_error, sizeof(g_error),
+             "columnbox colour: '%s' is not a colour option", option);
+    return 0;
+  }
+  return 1;
+}
+
+int rk_yab_columnbox_columns(const char *id) {
+  clear_error();
+  YabWidget *widget = find_widget(id);
+  int count = 0;
+
+  if (!widget || widget->kind != wkCOLUMNBOX) {
+    snprintf(g_error, sizeof(g_error),
+             "columnbox count: '%s' is not a column box", id ? id : "");
+    return 0;
+  }
+  if (!lock_widget(widget)) {
+    return 0;
+  }
+  YabColumnList *list = column_list(widget);
+  count = list ? list->CountColumns() : 0;
+  widget->window->window->Unlock();
+  return count;
+}
+
+const char *rk_yab_columnbox_get(const char *id, double column,
+                                 double position) {
+  clear_error();
+  YabWidget *widget = find_widget(id);
+  static char text[1024];
+
+  text[0] = '\0';
+  if (!widget || widget->kind != wkCOLUMNBOX) {
+    snprintf(g_error, sizeof(g_error),
+             "columnbox get: '%s' is not a column box", id ? id : "");
+    return text;
+  }
+  if (!lock_widget(widget)) {
+    return text;
+  }
+  YabColumnList *list = column_list(widget);
+  YabColumnRow *row =
+      list ? dynamic_cast<YabColumnRow *>(list->ItemAt((int32)position - 1))
+           : NULL;
+
+  if (row) {
+    snprintf(text, sizeof(text), "%s", row->Cell((int)column - 1));
+  } else {
+    snprintf(g_error, sizeof(g_error),
+             "columnbox get: '%s' has no row %d", id ? id : "",
+             (int)position);
+  }
+  widget->window->window->Unlock();
+  return text;
+}
+
+int rk_yab_calendar(double x, double y, const char *id, const char *format,
+                    const char *date, const char *view_name) {
+  clear_error();
+  float dx = 0.0f;
+  float dy = 0.0f;
+  YabWindow *window = widget_host(view_name, &dx, &dy);
+
+  if (!window) {
+    return 0;
+  }
+  YabCalendar *calendar = new YabCalendar(
+      BRect((float)x + dx, (float)y + dy, (float)x + dx + 210.0f,
+            (float)y + dy + 190.0f),
+      id ? id : "", format, date);
+
+  return finish_widget(window, wkCALENDAR, id, calendar, 0, NULL) ? 1 : 0;
+}
+
+int rk_yab_calendar_set(const char *id, const char *date) {
+  clear_error();
+  YabWidget *widget = find_widget(id);
+
+  if (!widget || widget->kind != wkCALENDAR) {
+    snprintf(g_error, sizeof(g_error),
+             "calendar set: '%s' is not a calendar", id ? id : "");
+    return 0;
+  }
+  if (!lock_widget(widget)) {
+    return 0;
+  }
+  YabCalendar *calendar = dynamic_cast<YabCalendar *>(widget->view);
+
+  if (calendar) {
+    calendar->SetDateText(date);
+  }
+  widget->window->window->Unlock();
+  return calendar ? 1 : 0;
+}
+
+const char *rk_yab_calendar_get(const char *id) {
+  clear_error();
+  YabWidget *widget = find_widget(id);
+  static char text[64];
+
+  text[0] = '\0';
+  if (!widget || widget->kind != wkCALENDAR) {
+    snprintf(g_error, sizeof(g_error),
+             "calendar get: '%s' is not a calendar", id ? id : "");
+    return text;
+  }
+  if (!lock_widget(widget)) {
+    return text;
+  }
+  YabCalendar *calendar = dynamic_cast<YabCalendar *>(widget->view);
+
+  if (calendar) {
+    snprintf(text, sizeof(text), "%s", calendar->DateText());
+  }
+  widget->window->window->Unlock();
+  return text;
+}
+
+int rk_yab_colorcontrol(double x, double y, const char *id,
+                        const char *view_name) {
+  clear_error();
+  float dx = 0.0f;
+  float dy = 0.0f;
+  YabWindow *window = widget_host(view_name, &dx, &dy);
+
+  if (!window) {
+    return 0;
+  }
+  BColorControl *control = new BColorControl(
+      BPoint((float)x + dx, (float)y + dy), B_CELLS_32x8, 2, id ? id : "",
+      new BMessage('rkcc'), false);
+
+  /* The control sizes itself from its corner, so the window clips it rather
+     than the command failing when it reaches past the window edge. */
+  return finish_widget_ex(window, wkCOLORCONTROL, id, control, NULL, 0, 0,
+                          NULL)
+             ? 1
+             : 0;
+}
+
+int rk_yab_colorcontrol_set(const char *id, int r, int g, int b) {
+  clear_error();
+  YabWidget *widget = find_widget(id);
+
+  if (!widget || widget->kind != wkCOLORCONTROL) {
+    snprintf(g_error, sizeof(g_error),
+             "colorcontrol set: '%s' is not a colour control", id ? id : "");
+    return 0;
+  }
+  if (!lock_widget(widget)) {
+    return 0;
+  }
+  BColorControl *control = dynamic_cast<BColorControl *>(widget->view);
+
+  if (control) {
+    control->SetValue(rgb_from(r, g, b));
+  }
+  widget->window->window->Unlock();
+  return control ? 1 : 0;
+}
+
+int rk_yab_colorcontrol_get(const char *id, const char *option) {
+  clear_error();
+  YabWidget *widget = find_widget(id);
+  int value = -1;
+
+  if (!widget || widget->kind != wkCOLORCONTROL) {
+    snprintf(g_error, sizeof(g_error),
+             "colorcontrol get: '%s' is not a colour control", id ? id : "");
+    return 0;
+  }
+  if (!option) {
+    set_error("colorcontrol get: an option is needed");
+    return 0;
+  }
+  if (!lock_widget(widget)) {
+    return 0;
+  }
+  BColorControl *control = dynamic_cast<BColorControl *>(widget->view);
+
+  if (control) {
+    rgb_color colour = control->ValueAsColor();
+
+    if (strcasecmp(option, "red") == 0) {
+      value = colour.red;
+    } else if (strcasecmp(option, "green") == 0) {
+      value = colour.green;
+    } else if (strcasecmp(option, "blue") == 0) {
+      value = colour.blue;
+    }
+  }
+  widget->window->window->Unlock();
+  if (value < 0) {
+    snprintf(g_error, sizeof(g_error),
+             "colorcontrol get: '%s' is not a colour option", option);
+    return 0;
+  }
+  return value;
 }
 
 } // extern "C"

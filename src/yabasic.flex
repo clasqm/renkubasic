@@ -264,6 +264,12 @@ SPLITVIEW {BEGIN(YABKEY);return tSPLITVIEW;}
 STACKVIEW {BEGIN(YABKEY);return tSTACKVIEW;}
 CANVAS {BEGIN(YABKEY);return tCANVAS;}
 REGION {BEGIN(YABKEY);return tREGION;}
+LISTBOX {BEGIN(YABKEY);return tLISTBOX;}
+DROPBOX {BEGIN(YABKEY);return tDROPBOX;}
+TREEBOX {BEGIN(YABKEY);return tTREEBOX;}
+COLUMNBOX {BEGIN(YABKEY);return tCOLUMNBOX;}
+CALENDAR {BEGIN(YABKEY);return tCALENDAR;}
+COLORCONTROL {BEGIN(YABKEY);return tCOLORCONTROL;}
   /* The command words are keywords only directly after a command keyword, and
      only when the whole word was written: `text 1, 2, set$` still scans set$
      as a string variable, while `text set "id", "centre"` gets tSET. */
@@ -271,7 +277,20 @@ REGION {BEGIN(YABKEY);return tREGION;}
 <YABKEY>GET/[ \t] {BEGIN(INITIAL);return tGET;}
 <YABKEY>ADD/[ \t] {BEGIN(INITIAL);return tADD;}
 <YABKEY>REMOVE/[ \t] {BEGIN(INITIAL);return tREMOVE;}
-<YABKEY>COUNT {BEGIN(INITIAL);return tCOUNT;}
+<YABKEY>SELECT/[ \t] {BEGIN(INITIAL);return tSELECT;}
+<YABKEY>SORT/[ \t] {BEGIN(INITIAL);return tSORT;}
+<YABKEY>EXPAND/[ \t] {BEGIN(INITIAL);return tEXPAND;}
+<YABKEY>COLLAPSE/[ \t] {BEGIN(INITIAL);return tCOLLAPSE;}
+<YABKEY>COLUMN/[ \t] {BEGIN(INITIAL);return tCOLUMN;}
+  /* yab's get$ returns text, get a number. Both stay available: the text
+     getters use get$, the numeric ones (item counts, the selected position,
+     colour components) use get, and `textcontrol get`/`textedit get` keep the
+     plain spelling they were introduced with. */
+<YABKEY>"GET$" {BEGIN(INITIAL);return tGETS;}
+  /* count stays in the command state, because `columnbox count column` is the
+     one form where a second command word follows; the state's fallback rule
+     rescans anything else normally. */
+<YABKEY>COUNT {return tCOUNT;}
 <YABKEY>{WS}+ ; /* skip blanks between the command words */
 <YABKEY>\n {yycolumn=1;BEGIN(INITIAL);yylval.nnl=1;return tSEP;}
 <YABKEY>. {BEGIN(INITIAL);yyless(0);} /* not a command word: scan it normally */

@@ -964,6 +964,53 @@ void function(struct command *cmd) /* performs a function */
     rk_yab_check();
     result = stSTRING;
     break;
+  /* The list family. The counts and the selected position are numbers; the
+     item text, the cell text and the calendar's date are strings. The bridge
+     reports a control of the wrong kind as a runtime error. */
+  case fYABLISTBOXCOUNT:
+  case fYABDROPBOXCOUNT:
+  case fYABTREEBOXCOUNT:
+  case fYABCOLUMNBOXCOUNT:
+    value = (double)rk_yab_list_count(a1->pointer);
+    rk_yab_check();
+    result = stNUMBER;
+    break;
+  case fYABLISTBOXSELECTED:
+  case fYABDROPBOXSELECTED:
+  case fYABTREEBOXSELECTED:
+  case fYABCOLUMNBOXSELECTED:
+    value = (double)rk_yab_list_selected(a1->pointer);
+    rk_yab_check();
+    result = stNUMBER;
+    break;
+  case fYABLISTBOXGET:
+  case fYABDROPBOXGET:
+  case fYABTREEBOXGET:
+    pointer = my_strdup((char *)rk_yab_list_get(a1->pointer, a2->value));
+    rk_yab_check();
+    result = stSTRING;
+    break;
+  case fYABCOLUMNBOXGET:
+    pointer = my_strdup(
+        (char *)rk_yab_columnbox_get(a1->pointer, a2->value, a3->value));
+    rk_yab_check();
+    result = stSTRING;
+    break;
+  case fYABCOLUMNBOXCOUNTCOLUMNS:
+    value = (double)rk_yab_columnbox_columns(a1->pointer);
+    rk_yab_check();
+    result = stNUMBER;
+    break;
+  case fYABCOLORCONTROLGET:
+    value = (double)rk_yab_colorcontrol_get(a1->pointer, a2->pointer);
+    rk_yab_check();
+    result = stNUMBER;
+    break;
+  case fYABCALENDARGET:
+    pointer = my_strdup((char *)rk_yab_calendar_get(a1->pointer));
+    rk_yab_check();
+    result = stSTRING;
+    break;
   case fTELL:
     i = (int)(a1->value);
     if (badstream(i, 0)) {
