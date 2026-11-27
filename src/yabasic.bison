@@ -173,6 +173,7 @@ void collect_missing_clauses(char *string, char exclude) {
 /* Menus and the clipboard: `menu`, `submenu` and `subsubmenu` take the command
    words `set`, `copy` and `paste$` from yab. */
 %token tMENU tSUBMENU tSUBSUBMENU tCLIPBOARD tCOPY tPASTE tTRANSLATE
+%token tATTRIBUTE
 /* Bitmaps: `bitmap w, h, name`, `bitmap get id, option, arg`,
    `bitmap remove id` and `draw bitmap x, y, id, mode, view`. */
 %token tBITMAP
@@ -457,6 +458,8 @@ statement:  /* empty */
   | tSUBSUBMENU tSET string_expression ',' string_expression ',' string_expression ',' string_expression ',' string_expression ',' string_expression {add_command(cYABSUBSUBMENUOPTION);}
   | tSUBSUBMENU tSET string_expression ',' string_expression ',' string_expression ',' expression ',' string_expression {add_command(cYABSUBSUBMENURADIO);}
   | tCLIPBOARD tCOPY string_expression {add_command(cYABCLIPBOARDCOPY);}
+  | tATTRIBUTE tSET string_expression ',' string_expression ',' string_expression ',' string_expression {add_command(cYABATTRIBUTESET);}
+  | tATTRIBUTE tCLEAR string_expression ',' string_expression {add_command(cYABATTRIBUTECLEAR);}
   | tBITMAP expression ',' expression ',' string_expression {add_command(cYABBITMAP);}
   | tBITMAP tGET string_expression ',' string_expression ',' string_expression {add_command(cYABBITMAPGET);}
   | tBITMAP tREMOVE string_expression {add_command(cYABBITMAPREMOVE);}
@@ -577,6 +580,7 @@ string_function: tLEFT '(' string_expression ',' expression ')' {create_function
   | tTRANSLATE '(' string_expression ')' {create_function(fYABTRANSLATE);}
   | tMENU tTRANSLATE '(' string_expression ')' {create_function(fYABMENUTRANSLATE);}
   | tCLIPBOARD tPASTE {create_function(fYABCLIPBOARDPASTE);}
+  | tATTRIBUTE tGETS '(' string_expression ',' string_expression ')' {create_function(fYABATTRIBUTEGET);}
   | tPEEK2 '(' string_expression ',' string_expression ')' {create_function(fPEEK3);}
   | tTOKENALT '(' string_scalar_or_array ',' string_expression ')' {add_command(cTOKENALT2);}
   | tTOKENALT '(' string_scalar_or_array ')' {add_command(cTOKENALT);}
@@ -716,6 +720,9 @@ function: tSIN '(' expression ')' {create_function(fSIN);}
      string_function: string_function results are popped as strings. */
   | tWINDOW tCOUNT {create_function(fYABNUMWINDOWS);}
   | tWINDOW tGET string_expression ',' string_expression {create_function(fYABWINDOWGET);}
+  /* `attribute get(name, file)` reads an attribute as a number, so it is a
+     numeric function; `attribute get$` above is the string one. */
+  | tATTRIBUTE tGET '(' string_expression ',' string_expression ')' {create_function(fYABATTRIBUTEGETNUM);}
   /* The list family's numeric getters: item counts, the selected position
      (1-based, 0 when nothing is selected) and the colour components. */
   | tLISTBOX tCOUNT string_expression %prec tARGUMENT {create_function(fYABLISTBOXCOUNT);}

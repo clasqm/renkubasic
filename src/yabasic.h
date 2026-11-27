@@ -306,6 +306,7 @@ enum functions {
     fYABLISTBOXGET, fYABDROPBOXGET, fYABTREEBOXGET, fYABCOLORCONTROLGET,
     fEOR, fSHL, fSHR, fLOG2,
     fRIGHT, fINSTR, fRINSTR, fSTR2, fMOD, fMIN, fMAX, fPEEK3, fMID2, fSTRING,
+    fYABATTRIBUTEGET, fYABATTRIBUTEGETNUM,
     fTWOARGS,
     fMID, fINSTR2, fRINSTR2, fSTR3, fREPLACE, fYABDRAWGETTEXT, fYABCOLUMNBOXGET,
     fTHREEARGS,
@@ -416,6 +417,9 @@ enum cmd_type {
     /* yab's bitmaps: an offscreen pixel buffer that `draw bitmap` blits into a
        view, used for double buffering and for tracker icons. */
     cYABBITMAP, cYABBITMAPDRAW, cYABBITMAPGET, cYABBITMAPREMOVE,
+    /* yab's file attributes: typed metadata on a file, read and written
+       through BNode rather than through the GUI. */
+    cYABATTRIBUTESET, cYABATTRIBUTECLEAR,
 
     cLAST_COMMAND			/* no command, just marks end of list */
 };

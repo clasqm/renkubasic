@@ -285,6 +285,25 @@ exit 0'; then
   fi
 fi
 
+# File attributes need BNode, which only Haiku has. The probe writes one and
+# reads it back, so a build without them skips the attributes tests.
+ATTRIBUTES_OK=0
+if [ "$IS_RENKU" = "1" ]; then
+  if probe_family attributes attributes-probe.yab attributes-probe.log 'f$ = "rk-attributes-probe.txt"
+open f$ for writing as #1
+print #1 "probe"
+close #1
+attribute set "string", "RENKU:probe", "yes", f$
+r$ = attribute get$("RENKU:probe", f$)
+attribute clear "RENKU:probe", f$
+if r$ <> "yes" then exit 1
+exit 0'; then
+    ATTRIBUTES_OK=1
+  else
+    probe_note attributes "$SCRATCH/attributes-probe.log"
+  fi
+fi
+
 # The yabasic graphic window is a separate capability from yab's widget
 # windows: it can exist before the compatibility layer does.
 GRAPHICS_OK=0
@@ -335,6 +354,7 @@ requirement_met() {
     gui-menus) [ "$MENUS_OK" = "1" ] ;;
     gui-bitmaps) [ "$BITMAPS_OK" = "1" ] ;;
     graphics) [ "$GRAPHICS_OK" = "1" ] ;;
+    attributes) [ "$ATTRIBUTES_OK" = "1" ] ;;
     pty) [ "$HAS_PTY" = "1" ] ;;
     haiku) case "$OSNAME" in haiku|renkuos) return 0 ;; *) return 1 ;; esac ;;
     ffi)
@@ -406,6 +426,7 @@ echo "  gui-lists   : $([ "$LISTS_OK" = "1" ] && echo available || echo unavaila
 echo "  gui-menus   : $([ "$MENUS_OK" = "1" ] && echo available || echo unavailable)"
 echo "  gui-bitmaps : $([ "$BITMAPS_OK" = "1" ] && echo available || echo unavailable)"
 echo "  graphics    : $([ "$GRAPHICS_OK" = "1" ] && echo available || echo unavailable)"
+echo "  attributes  : $([ "$ATTRIBUTES_OK" = "1" ] && echo available || echo unavailable)"
 echo "  pty         : $([ "$HAS_PTY" = "1" ] && echo available || echo unavailable)"
 echo
 

@@ -1400,6 +1400,8 @@ static void initialize(void)
   cexplanation[cYABBITMAPDRAW] = "YABBITMAPDRAW";
   cexplanation[cYABBITMAPGET] = "YABBITMAPGET";
   cexplanation[cYABBITMAPREMOVE] = "YABBITMAPREMOVE";
+  cexplanation[cYABATTRIBUTESET] = "YABATTRIBUTESET";
+  cexplanation[cYABATTRIBUTECLEAR] = "YABATTRIBUTECLEAR";
   cexplanation[cOPENPRN] = "OPENPRN";
   cexplanation[cCLOSEPRN] = "CLOSEPRN";
   cexplanation[cTESTEOF] = "TESTEOF";
@@ -1530,6 +1532,8 @@ static void initialize(void)
   fexplanation[fGETCHAR] = "GETCHAR";
   fexplanation[fYABNUMWINDOWS] = "YABNUMWINDOWS";
   fexplanation[fYABCLIPBOARDPASTE] = "YABCLIPBOARDPASTE";
+  fexplanation[fYABATTRIBUTEGET] = "YABATTRIBUTEGET";
+  fexplanation[fYABATTRIBUTEGETNUM] = "YABATTRIBUTEGETNUM";
   fexplanation[fYABBFILESIZE] = "YABBFILESIZE";
   fexplanation[fYABWINDOWGET] = "YABWINDOWGET";
   fexplanation[fYABDRAWGET] = "YABDRAWGET";
@@ -2120,6 +2124,8 @@ static void run_it()
       case cYABBITMAPDRAW:
       case cYABBITMAPGET:
       case cYABBITMAPREMOVE:
+      case cYABATTRIBUTESET:
+      case cYABATTRIBUTECLEAR:
         rk_yab_command(currcmd);
         DONE;
       case cRECT:

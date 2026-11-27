@@ -25,6 +25,7 @@ next slices.
 | yab lists, tree/column, calendar, colour control | `src/yabcompat/rk_yab.cpp` | done; the `gui-lists` tests run |
 | yab menus, submenus and the clipboard | `src/yabcompat/rk_yab.cpp` | done; the `gui-menus` tests run |
 | yab bitmaps | `src/yabcompat/rk_yab.cpp` | done; the `gui-bitmaps` test runs |
+| yab file attributes (`attribute set`/`clear`/`get$`/`get`) | `src/yabcompat/rk_yab.cpp` | done; the `attributes` capability turns on the test |
 
 ## Design decisions
 
@@ -220,7 +221,7 @@ like `rk_gui_save_png()`.
   than scrolling its contents; a spin control is a text field with `+`/`-`
   buttons, because Haiku has no spinner; `textedit` wraps but has no scrollbars
   yet; and `texturl` keeps its link as a tool tip, since there is no URL
-  handler. `attribute` and `message$` (widget events) are still open.
+  handler. `message$` (widget events) is still open.
 * **Only the widget properties the tests need exist.** `option set` knows
   `label`/`text`, `enabled`, `value` and `tooltip`; `option colour` knows
   `bgcolor`, `highcolor` and `lowcolor`; a slider knows `barcolor` and
@@ -737,10 +738,60 @@ steps; when the lock still does not arrive nothing is freed, the window goes
 back into the registry, and `window close` fails with "the window did not
 respond to window close" instead of pretending.
 
-What the next Haiku run has to show: `gui-bitmaps : available`, `g0120`
-passing, `g0115` passing again, and the other fifteen GUI tests unchanged.
-Should `g0115` fail again, its stderr now names the signal, and the trace says
-which backend step came last.
+The rerun passed everything: CLI 39 / 0 / 2, GUI 17 / 0 / 0, `g0115` among
+them. That is the second intermittent failure in that test and the only change
+between the failing and the passing run was the close-path fix, so the failed
+lock is the best explanation the evidence supports; the trace and the signal
+name stay in, because a future failure of that test has to be readable.
 
-Next slice: `attribute`, `message$` and widget events; then the tab/box/split
-polish that the gaps list names.
+**Round 12 (2026-11-27).** File attributes: `attribute set type, name, value,
+file`, `attribute clear name, file`, `attribute get$(name, file)` and
+`attribute get(name, file)`. This is not a widget feature: yab's `attribute`
+writes typed metadata onto a file through `BNode`, which is why it is a slice of
+its own and why it lands in the CLI suite rather than the GUI one. Notes:
+
+* The type word is matched the way yab matches it -- case-insensitively,
+  anywhere in the string, in yab's order: `string`, `mime`, `bool`, `i8`, `u8`,
+  `i16`, `u16`, `int`, `l32`, `u32`, `l64`, `u64`, `double`, `float`, `time`.
+  Because the order is yab's, `uint32` is written as an `int` (it contains
+  `int`); that is yab's behaviour, not an oversight.
+* `bool` is one byte, 0 only when the value contains "false", and `string`/
+  `mime` are stored with their terminating zero, as yab stores them.
+* Integers are range-clamped to their type exactly as yab clamps them, so
+  `attribute set "u8", ..., "300", ...` stores 255.
+* `attribute get$` reads the type back: numbers and bools as text, `time` through
+  `localtime` and `strftime("%c")`, string and MIME types (and the three
+  signature types) as the stored text, and anything else as yab's hex dump with
+  the empty string as the result. With an empty name it lists every attribute of
+  the file as `name | Type | name | Type |`, trailing separator included, using
+  yab's type names (`String`, `Int`, `Bool`, `Long`, ...).
+* `attribute get` is a numeric function in the grammar, not a string one: a rule
+  in `string_function` makes the compiler pop the result as a string and the
+  number turns into "expected a string but found a number" at run time. Sorting
+  that out cost a round trip, and the rule for `attribute get$` stayed where it
+  was; the grammar still has exactly the expected six conflicts.
+* `attribute clear` ignores whether the attribute was there, as yab does.
+
+Two deliberate departures from yab, both in `attribute set`, both about types
+yab writes in a form no reader can use: `int`/`l32` write a real 32-bit integer
+instead of the value's characters, and `time` writes the seconds it parses
+instead of the value's characters under `B_TIME_TYPE`. yab's empty-name fallback
+of returning the directory of the running program when the file does not exist
+is not ported either; a file that cannot be read is an error naming it.
+
+Checked here (Linux, no attributes): the grammar regenerates with the expected
+six conflicts; all C sources plus the stub bridges build and link; the test
+program compiles and reaches the bridge (the stub refuses, so the run stops
+there); a scratch program exercises both getter spellings in an assignment and
+inside `print`, which is what found the arity and `string_function` mistakes;
+and the CLI suite stays at 35 / 0 / 7 with `c084` skipped for the missing
+capability. Not checked: anything on Haiku -- no attribute has been written
+through `BNode` here, so the round trip, the type words and the listing format
+are the next run's business.
+
+What the next Haiku run has to show: `attributes : available` in the banner, 36
+CLI tests passed with `c084-attributes` among them, and the GUI suite unchanged
+at 17 / 0 / 0.
+
+Next slice: `message$` and widget events; then the tab/box/split polish that the
+gaps list names.

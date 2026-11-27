@@ -38,6 +38,7 @@
 #include <ColorControl.h>
 #include <File.h>
 #include <Font.h>
+#include <fs_attr.h> /* attr_info, for the file attribute commands */
 #include <ListItem.h>
 #include <ListView.h>
 #include <Menu.h>
@@ -73,6 +74,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <string>
 #include <vector>
 
 #include "rk_gui.h"
@@ -5006,6 +5008,361 @@ int rk_yab_bitmap_remove(const char *id) {
   snprintf(g_error, sizeof(g_error), "bitmap remove: '%s' is not a bitmap",
            id ? id : "");
   return 0;
+}
+
+/* ---- file attributes ---------------------------------------------------- */
+
+/* yab reads every attribute through one buffer and never reads more of it than
+   the buffer holds, so an oversized attribute cost the same there. Keep the
+   ceiling, and read into the same kind of static buffer. */
+static const int kAttributeBufferSize = 32567;
+static char g_attribute_bytes[kAttributeBufferSize];
+static char g_attribute_text[256];
+static std::string g_attribute_list;
+
+static bool attribute_contains(const char *text, const char *word) {
+  /* yab matches the type word with IFindFirst: case-insensitively, anywhere in
+     the string, in the order the types are tested. */
+  size_t length = strlen(word);
+  const char *at = text;
+
+  while (*at) {
+    if (strncasecmp(at, word, length) == 0) {
+      return true;
+    }
+    at++;
+  }
+  return false;
+}
+
+static long long attribute_clamp(long long number, long long low,
+                                 long long high) {
+  if (number < low) {
+    return low;
+  }
+  if (number > high) {
+    return high;
+  }
+  return number;
+}
+
+/* The names yab's `attribute get$` listing prints for each type. */
+static const char *attribute_type_name(type_code type) {
+  switch (type) {
+    case B_INT8_TYPE:
+      return "int8";
+    case B_UINT8_TYPE:
+      return "uint8";
+    case B_INT16_TYPE:
+      return "int16";
+    case B_UINT16_TYPE:
+      return "uint16";
+    case B_BOOL_TYPE:
+      return "Bool";
+    case B_RAW_TYPE:
+      return "Raw_data";
+    case B_STRING_TYPE:
+      return "String";
+    case B_MIME_STRING_TYPE:
+      return "Mime";
+    case B_INT32_TYPE:
+      return "Int";
+    case B_UINT32_TYPE:
+      return "uint32";
+    case B_DOUBLE_TYPE:
+      return "Double";
+    case B_FLOAT_TYPE:
+      return "Float";
+    case B_INT64_TYPE:
+      return "Long";
+    case B_UINT64_TYPE:
+      return "uint64";
+    case B_MESSAGE_TYPE:
+      return "message";
+    case B_TIME_TYPE:
+      return "Time";
+    default:
+      return "Unsupported";
+  }
+}
+
+/* yab prints an attribute it has no reading for as a hex dump, and `attribute
+   get$` then returns the empty string. Keep the dump, but print bytes that are
+   not printable as dots so a binary attribute cannot take over the output. */
+static void attribute_dump(const char *bytes, int size) {
+  for (int position = 0; position < size; position += 16) {
+    printf("\t%04x: ", (unsigned)position);
+    for (int i = 0; i < 16; i++) {
+      if (position + i < size) {
+        printf("%02x ", (unsigned char)bytes[position + i]);
+      } else {
+        printf("   ");
+      }
+    }
+    printf(" ");
+    for (int i = 0; i < 16 && position + i < size; i++) {
+      unsigned char byte = (unsigned char)bytes[position + i];
+      printf("%c", byte >= 32 && byte < 127 ? byte : '.');
+    }
+    printf("\n");
+  }
+}
+
+/* Reads one attribute into g_attribute_bytes. Returns the number of bytes read,
+   or -1 when the attribute is not there or cannot be read. */
+static int attribute_read(BNode &node, const char *name, type_code *type) {
+  attr_info info;
+
+  if (node.GetAttrInfo(name, &info) != B_OK) {
+    return -1;
+  }
+  *type = info.type;
+  int size = (int)info.size;
+  if (size > kAttributeBufferSize) {
+    size = kAttributeBufferSize;
+  }
+  memset(g_attribute_bytes, 0, sizeof(g_attribute_bytes));
+  if (size <= 0) {
+    return 0;
+  }
+  if (node.ReadAttr(name, info.type, 0, g_attribute_bytes, size) <= 0) {
+    return -1;
+  }
+  return size;
+}
+
+int rk_yab_attribute_set(const char *type, const char *name, const char *value,
+                         const char *file) {
+  clear_error();
+  if (!name || !*name) {
+    set_error("attribute set: an attribute needs a name");
+    return 0;
+  }
+  BNode node(file ? file : "");
+  if (node.InitCheck() != B_OK) {
+    snprintf(g_error, sizeof(g_error), "attribute set: '%s' cannot be read",
+             file ? file : "");
+    return 0;
+  }
+  const char *text = value ? value : "";
+  const char *which = type ? type : "";
+  status_t written = B_OK;
+
+  if (attribute_contains(which, "string")) {
+    written = node.WriteAttr(name, B_STRING_TYPE, 0, text, strlen(text) + 1);
+  } else if (attribute_contains(which, "mime")) {
+    written =
+        node.WriteAttr(name, B_MIME_STRING_TYPE, 0, text, strlen(text) + 1);
+  } else if (attribute_contains(which, "bool")) {
+    /* One byte: yab stores 0 only when the value contains "false". */
+    char flag = attribute_contains(text, "false") ? 0 : 1;
+    written = node.WriteAttr(name, B_BOOL_TYPE, 0, &flag, 1);
+  } else if (attribute_contains(which, "i8")) {
+    int8 number =
+        (int8)attribute_clamp(strtoll(text, NULL, 10), -128, 127);
+    written = node.WriteAttr(name, B_INT8_TYPE, 0, &number, 1);
+  } else if (attribute_contains(which, "u8")) {
+    uint8 number = (uint8)attribute_clamp(strtoll(text, NULL, 10), 0, 255);
+    written = node.WriteAttr(name, B_UINT8_TYPE, 0, &number, 1);
+  } else if (attribute_contains(which, "i16")) {
+    int16 number =
+        (int16)attribute_clamp(strtoll(text, NULL, 10), -32768, 32767);
+    written = node.WriteAttr(name, B_INT16_TYPE, 0, &number, 2);
+  } else if (attribute_contains(which, "u16")) {
+    uint16 number = (uint16)attribute_clamp(strtoll(text, NULL, 10), 0, 65535);
+    written = node.WriteAttr(name, B_UINT16_TYPE, 0, &number, 2);
+  } else if (attribute_contains(which, "int")) {
+    int32 number = (int32)attribute_clamp(strtoll(text, NULL, 10),
+                                         -2147483647LL - 1, 2147483647LL);
+    written = node.WriteAttr(name, B_INT32_TYPE, 0, &number, 4);
+  } else if (attribute_contains(which, "l32")) {
+    int32 number = (int32)attribute_clamp(strtoll(text, NULL, 10),
+                                         -2147483647LL - 1, 2147483647LL);
+    written = node.WriteAttr(name, B_INT32_TYPE, 0, &number, 4);
+  } else if (attribute_contains(which, "u32")) {
+    long long number = attribute_clamp(strtoll(text, NULL, 10), 0, 4294967295LL);
+    uint32 stored = (uint32)number;
+    written = node.WriteAttr(name, B_UINT32_TYPE, 0, &stored, 4);
+  } else if (attribute_contains(which, "l64")) {
+    int64 number = (int64)strtoll(text, NULL, 10);
+    written = node.WriteAttr(name, B_INT64_TYPE, 0, &number, 8);
+  } else if (attribute_contains(which, "u64")) {
+    uint64 number = (uint64)strtoull(text, NULL, 10);
+    written = node.WriteAttr(name, B_UINT64_TYPE, 0, &number, 8);
+  } else if (attribute_contains(which, "double")) {
+    double number = strtod(text, NULL);
+    written = node.WriteAttr(name, B_DOUBLE_TYPE, 0, &number, sizeof(number));
+  } else if (attribute_contains(which, "float")) {
+    float number = (float)strtod(text, NULL);
+    written = node.WriteAttr(name, B_FLOAT_TYPE, 0, &number, sizeof(number));
+  } else if (attribute_contains(which, "time")) {
+    /* yab writes the value's characters under B_TIME_TYPE, which no reader can
+       use; store the seconds it names, which is what `attribute get$` formats
+       back into a date. */
+    time_t when = (time_t)strtoll(text, NULL, 10);
+    written = node.WriteAttr(name, B_TIME_TYPE, 0, &when, sizeof(when));
+  } else {
+    snprintf(g_error, sizeof(g_error),
+             "attribute set: '%s' is not an attribute type", which);
+    return 0;
+  }
+  if (written < B_OK) {
+    snprintf(g_error, sizeof(g_error), "attribute set: '%s' cannot be written",
+             name);
+    return 0;
+  }
+  return 1;
+}
+
+int rk_yab_attribute_clear(const char *name, const char *file) {
+  clear_error();
+  if (!name || !*name) {
+    set_error("attribute clear: an attribute needs a name");
+    return 0;
+  }
+  BNode node(file ? file : "");
+  if (node.InitCheck() != B_OK) {
+    snprintf(g_error, sizeof(g_error), "attribute clear: '%s' cannot be read",
+             file ? file : "");
+    return 0;
+  }
+  /* yab ignores the result: clearing an attribute that is not there is fine. */
+  node.RemoveAttr(name);
+  return 1;
+}
+
+const char *rk_yab_attribute_get(const char *name, const char *file) {
+  clear_error();
+  BNode node(file ? file : "");
+  if (node.InitCheck() != B_OK) {
+    snprintf(g_error, sizeof(g_error), "attribute get: '%s' cannot be read",
+             file ? file : "");
+    return "";
+  }
+  if (!name || !*name) {
+    /* yab lists every attribute of the file as "name | Type | name | Type |",
+       trailing separator and all, which is the shape its own programs read. */
+    g_attribute_list.clear();
+    char found[B_ATTR_NAME_LENGTH];
+    while (node.GetNextAttrName(found) == B_OK) {
+      attr_info info;
+      if (node.GetAttrInfo(found, &info) != B_OK) {
+        continue;
+      }
+      g_attribute_list += found;
+      g_attribute_list += " | ";
+      g_attribute_list += attribute_type_name(info.type);
+      g_attribute_list += " | ";
+    }
+    return g_attribute_list.c_str();
+  }
+  type_code type;
+  int size = attribute_read(node, name, &type);
+  if (size < 0) {
+    snprintf(g_error, sizeof(g_error),
+             "attribute get: '%s' is not an attribute of '%s'", name,
+             file ? file : "");
+    return "";
+  }
+  if (size == 0) {
+    return "";
+  }
+  switch (type) {
+    case B_INT8_TYPE:
+      snprintf(g_attribute_text, sizeof(g_attribute_text), "%d",
+               (int)*(int8 *)g_attribute_bytes);
+      return g_attribute_text;
+    case B_UINT8_TYPE:
+      snprintf(g_attribute_text, sizeof(g_attribute_text), "%u",
+               (unsigned)*(uint8 *)g_attribute_bytes);
+      return g_attribute_text;
+    case B_INT16_TYPE:
+      snprintf(g_attribute_text, sizeof(g_attribute_text), "%d",
+               (int)*(int16 *)g_attribute_bytes);
+      return g_attribute_text;
+    case B_UINT16_TYPE:
+      snprintf(g_attribute_text, sizeof(g_attribute_text), "%u",
+               (unsigned)*(uint16 *)g_attribute_bytes);
+      return g_attribute_text;
+    case B_INT32_TYPE:
+      snprintf(g_attribute_text, sizeof(g_attribute_text), "%ld",
+               (long)*(int32 *)g_attribute_bytes);
+      return g_attribute_text;
+    case B_UINT32_TYPE:
+      snprintf(g_attribute_text, sizeof(g_attribute_text), "%lu",
+               (unsigned long)*(uint32 *)g_attribute_bytes);
+      return g_attribute_text;
+    case B_INT64_TYPE:
+      snprintf(g_attribute_text, sizeof(g_attribute_text), "%lld",
+               (long long)*(int64 *)g_attribute_bytes);
+      return g_attribute_text;
+    case B_UINT64_TYPE:
+      snprintf(g_attribute_text, sizeof(g_attribute_text), "%llu",
+               (unsigned long long)*(uint64 *)g_attribute_bytes);
+      return g_attribute_text;
+    case B_FLOAT_TYPE:
+      snprintf(g_attribute_text, sizeof(g_attribute_text), "%f",
+               (double)*(float *)g_attribute_bytes);
+      return g_attribute_text;
+    case B_DOUBLE_TYPE:
+      snprintf(g_attribute_text, sizeof(g_attribute_text), "%f",
+               *(double *)g_attribute_bytes);
+      return g_attribute_text;
+    case B_BOOL_TYPE:
+      snprintf(g_attribute_text, sizeof(g_attribute_text), "%d",
+               *(int8 *)g_attribute_bytes ? 1 : 0);
+      return g_attribute_text;
+    case B_TIME_TYPE: {
+      time_t when = 0;
+      memcpy(&when, g_attribute_bytes,
+             size < (int)sizeof(when) ? size : (int)sizeof(when));
+      struct tm parts;
+      if (!localtime_r(&when, &parts)) {
+        return "";
+      }
+      strftime(g_attribute_text, sizeof(g_attribute_text), "%c", &parts);
+      return g_attribute_text;
+    }
+    case B_STRING_TYPE:
+    case B_MIME_STRING_TYPE:
+    case 'MSIG':
+    case 'MSDC':
+    case 'MPTH':
+      /* The buffer is zeroed before the read, so the text ends where it ends. */
+      return g_attribute_bytes;
+    default:
+      attribute_dump(g_attribute_bytes, size);
+      return "";
+  }
+}
+
+double rk_yab_attribute_getnum(const char *name, const char *file) {
+  clear_error();
+  BNode node(file ? file : "");
+  if (node.InitCheck() != B_OK) {
+    snprintf(g_error, sizeof(g_error), "attribute get: '%s' cannot be read",
+             file ? file : "");
+    return 0.0;
+  }
+  if (!name || !*name) {
+    set_error("attribute get: an attribute needs a name");
+    return 0.0;
+  }
+  type_code type;
+  int size = attribute_read(node, name, &type);
+  if (size < 0) {
+    snprintf(g_error, sizeof(g_error),
+             "attribute get: '%s' is not an attribute of '%s'", name,
+             file ? file : "");
+    return 0.0;
+  }
+  if (size == 0) {
+    return 0.0;
+  }
+  if (type == B_BOOL_TYPE) {
+    return *(int8 *)g_attribute_bytes ? 1.0 : 0.0;
+  }
+  return atof(g_attribute_bytes);
 }
 
 } // extern "C"

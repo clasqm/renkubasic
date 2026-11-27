@@ -865,6 +865,22 @@ void rk_yab_command(struct command *cmd) {
         rk_yab_subsubmenu_option(head, item, subitem, subsubitem, option, view));
     break;
   }
+  case cYABATTRIBUTESET: {
+    char *file = take_string();
+    char *value = take_string();
+    char *name = take_string();
+    char *type = take_string();
+
+    expect(rk_yab_attribute_set(type, name, value, file));
+    break;
+  }
+  case cYABATTRIBUTECLEAR: {
+    char *file = take_string();
+    char *name = take_string();
+
+    expect(rk_yab_attribute_clear(name, file));
+    break;
+  }
   case cYABCLIPBOARDCOPY: {
     char *text = take_string();
 

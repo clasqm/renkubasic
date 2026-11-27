@@ -323,6 +323,25 @@ int rk_yab_subsubmenu_option(const char *head, const char *item,
 int rk_yab_clipboard_copy(const char *text);
 const char *rk_yab_clipboard_paste(void);
 
+/* ---- file attributes --------------------------------------------------- */
+
+/* `attribute set type, name, value, file` writes a typed attribute. The type
+   is yab's word, matched case-insensitively anywhere in the string, in yab's
+   order: string, mime, bool, i8, u8, i16, u16, int, l32, u32, l64, u64,
+   double, float, time. */
+int rk_yab_attribute_set(const char *type, const char *name, const char *value,
+                         const char *file);
+/* `attribute clear name, file`: removing an attribute that is not there is
+   not an error, as in yab. */
+int rk_yab_attribute_clear(const char *name, const char *file);
+/* `attribute get$(name, file)`: the attribute as text, every attribute of the
+   file when the name is empty ("name | Type | ..."). The string is owned by
+   the bridge until the next call. */
+const char *rk_yab_attribute_get(const char *name, const char *file);
+/* `attribute get(name, file)`: the attribute as a number; bool attributes are
+   0 or 1 and everything else is read like yab reads it, with atof. */
+double rk_yab_attribute_getnum(const char *name, const char *file);
+
 /* `translate$(...)` and `menu translate$(...)`. */
 const char *rk_yab_translate(const char *text);
 const char *rk_yab_menu_translate(const char *text);

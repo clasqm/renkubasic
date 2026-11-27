@@ -269,6 +269,7 @@ MENU {BEGIN(YABKEY);return tMENU;}
 SUBMENU {BEGIN(YABKEY);return tSUBMENU;}
 SUBSUBMENU {BEGIN(YABKEY);return tSUBSUBMENU;}
 CLIPBOARD {BEGIN(YABKEY);return tCLIPBOARD;}
+ATTRIBUTE {BEGIN(YABKEY);return tATTRIBUTE;}
 "TRANSLATE$" return tTRANSLATE;
 LISTBOX {BEGIN(YABKEY);return tLISTBOX;}
 DROPBOX {BEGIN(YABKEY);return tDROPBOX;}
@@ -299,6 +300,10 @@ COLORCONTROL {BEGIN(YABKEY);return tCOLORCONTROL;}
      colour components) use get, and `textcontrol get`/`textedit get` keep the
      plain spelling they were introduced with. */
 <YABKEY>"GET$" {BEGIN(INITIAL);return tGETS;}
+  /* `attribute get(...)` puts the parenthesis straight after the word, with
+     no space for the rule above to take; yab spells the numeric getter
+     `get` there too. The parenthesis is pushed back for the parser. */
+<YABKEY>"GET(" {BEGIN(INITIAL);yyless(yyleng-1);return tGET;}
   /* count stays in the command state, because `columnbox count column` is the
      one form where a second command word follows; the state's fallback rule
      rescans anything else normally. */

@@ -1029,6 +1029,19 @@ void function(struct command *cmd) /* performs a function */
     rk_yab_check();
     result = stSTRING;
     break;
+  /* yab's file attributes. `attribute get$` reads one attribute as text, or
+     lists every attribute of the file when the name is empty; `attribute
+     get` reads one as a number. */
+  case fYABATTRIBUTEGET:
+    pointer = my_strdup((char *)rk_yab_attribute_get(a1->pointer, a2->pointer));
+    rk_yab_check();
+    result = stSTRING;
+    break;
+  case fYABATTRIBUTEGETNUM:
+    value = rk_yab_attribute_getnum(a1->pointer, a2->pointer);
+    rk_yab_check();
+    result = stNUMBER;
+    break;
   case fTELL:
     i = (int)(a1->value);
     if (badstream(i, 0)) {

@@ -1,0 +1,51 @@
+// RenkuBASIC CLI test: file attributes
+// Derived from: yab 1.8.3's `attribute set`, `attribute clear`,
+//               `attribute get$` and `attribute get` (YabInterface.cpp).
+// Haiku keeps typed metadata beside a file, so these commands work in any
+// directory the user can write to. The runner gives every test its own
+// working directory, so relative file names are safe.
+
+// @requires: attributes
+
+import harness
+
+f$ = "rk-attributes.txt"
+open f$ for writing as #1
+print #1 "attributes"
+close #1
+
+// A string attribute comes back exactly as it went in.
+attribute set "string", "RENKU:note", "hello, attributes", f$
+assert_str$(attribute get$("RENKU:note", f$), "hello, attributes", "string attribute")
+
+// Numbers: int is stored as a 32-bit integer, double as a double.
+attribute set "int", "RENKU:count", "42", f$
+assert_str$(attribute get$("RENKU:count", f$), "42", "int attribute as text")
+assert_eq(attribute get("RENKU:count", f$), 42, "int attribute as a number")
+
+attribute set "double", "RENKU:ratio", "0.5", f$
+assert_near(attribute get("RENKU:ratio", f$), 0.5, 0.0001, "double attribute")
+
+// bool is one byte: anything that does not say "false" is true.
+attribute set "bool", "RENKU:flag", "true", f$
+assert_eq(attribute get("RENKU:flag", f$), 1, "a bool attribute holding true")
+attribute set "bool", "RENKU:flag", "false", f$
+assert_eq(attribute get("RENKU:flag", f$), 0, "a bool attribute holding false")
+
+// get$ with an empty name lists the attributes as "name | Type | ..." and does
+// not spill their values.
+attribute set "mime", "BEOS:TYPE", "text/plain", f$
+listing$ = attribute get$("", f$)
+assert_true(instr(listing$, "RENKU:note") > 0, "the listing names a string attribute")
+assert_true(instr(listing$, "String") > 0, "the listing names the attribute type")
+assert_true(instr(listing$, "text/plain") = 0, "the listing holds names, not values")
+
+// clear removes an attribute, and the name can be set again afterwards;
+// clearing one leaves the others alone.
+attribute clear "RENKU:note", f$
+attribute set "string", "RENKU:note", "again", f$
+assert_str$(attribute get$("RENKU:note", f$), "again", "an attribute can be set again")
+assert_eq(attribute get("RENKU:count", f$), 42, "clearing one leaves the others")
+
+print "c084 done"
+exit 0
