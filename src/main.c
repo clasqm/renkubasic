@@ -1386,6 +1386,16 @@ static void initialize(void)
   cexplanation[cYABCALENDARSET] = "YABCALENDARSET";
   cexplanation[cYABCOLORCONTROL] = "YABCOLORCONTROL";
   cexplanation[cYABCOLORCONTROLSET] = "YABCOLORCONTROLSET";
+  cexplanation[cYABMENU] = "YABMENU";
+  cexplanation[cYABMENURADIO] = "YABMENURADIO";
+  cexplanation[cYABMENUOPTION] = "YABMENUOPTION";
+  cexplanation[cYABSUBMENU] = "YABSUBMENU";
+  cexplanation[cYABSUBMENURADIO] = "YABSUBMENURADIO";
+  cexplanation[cYABSUBMENUOPTION] = "YABSUBMENUOPTION";
+  cexplanation[cYABSUBSUBMENU] = "YABSUBSUBMENU";
+  cexplanation[cYABSUBSUBMENURADIO] = "YABSUBSUBMENURADIO";
+  cexplanation[cYABSUBSUBMENUOPTION] = "YABSUBSUBMENUOPTION";
+  cexplanation[cYABCLIPBOARDCOPY] = "YABCLIPBOARDCOPY";
   cexplanation[cOPENPRN] = "OPENPRN";
   cexplanation[cCLOSEPRN] = "CLOSEPRN";
   cexplanation[cTESTEOF] = "TESTEOF";
@@ -1515,6 +1525,7 @@ static void initialize(void)
   fexplanation[fGETBIT] = "GETBIT";
   fexplanation[fGETCHAR] = "GETCHAR";
   fexplanation[fYABNUMWINDOWS] = "YABNUMWINDOWS";
+  fexplanation[fYABCLIPBOARDPASTE] = "YABCLIPBOARDPASTE";
   fexplanation[fYABBFILESIZE] = "YABBFILESIZE";
   fexplanation[fYABWINDOWGET] = "YABWINDOWGET";
   fexplanation[fYABDRAWGET] = "YABDRAWGET";
@@ -1530,6 +1541,8 @@ static void initialize(void)
   fexplanation[fYABCOLUMNBOXCOUNT] = "YABCOLUMNBOXCOUNT";
   fexplanation[fYABCOLUMNBOXSELECTED] = "YABCOLUMNBOXSELECTED";
   fexplanation[fYABCALENDARGET] = "YABCALENDARGET";
+  fexplanation[fYABTRANSLATE] = "YABTRANSLATE";
+  fexplanation[fYABMENUTRANSLATE] = "YABMENUTRANSLATE";
   fexplanation[fYABLISTBOXGET] = "YABLISTBOXGET";
   fexplanation[fYABDROPBOXGET] = "YABDROPBOXGET";
   fexplanation[fYABTREEBOXGET] = "YABTREEBOXGET";
@@ -2085,6 +2098,16 @@ static void run_it()
       case cYABCALENDARSET:
       case cYABCOLORCONTROL:
       case cYABCOLORCONTROLSET:
+      case cYABMENU:
+      case cYABMENURADIO:
+      case cYABMENUOPTION:
+      case cYABSUBMENU:
+      case cYABSUBMENURADIO:
+      case cYABSUBMENUOPTION:
+      case cYABSUBSUBMENU:
+      case cYABSUBSUBMENURADIO:
+      case cYABSUBSUBMENUOPTION:
+      case cYABCLIPBOARDCOPY:
         rk_yab_command(currcmd);
         DONE;
       case cRECT:

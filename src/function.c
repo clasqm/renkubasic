@@ -1011,6 +1011,24 @@ void function(struct command *cmd) /* performs a function */
     rk_yab_check();
     result = stSTRING;
     break;
+  /* Menus and the clipboard. RenkuBASIC ships no message catalogs, so a
+     translation is the identifier itself, which is also what yab returns for a
+     key its catalog does not know. */
+  case fYABTRANSLATE:
+    pointer = my_strdup((char *)rk_yab_translate(a1->pointer));
+    rk_yab_check();
+    result = stSTRING;
+    break;
+  case fYABMENUTRANSLATE:
+    pointer = my_strdup((char *)rk_yab_menu_translate(a1->pointer));
+    rk_yab_check();
+    result = stSTRING;
+    break;
+  case fYABCLIPBOARDPASTE:
+    pointer = my_strdup((char *)rk_yab_clipboard_paste());
+    rk_yab_check();
+    result = stSTRING;
+    break;
   case fTELL:
     i = (int)(a1->value);
     if (badstream(i, 0)) {

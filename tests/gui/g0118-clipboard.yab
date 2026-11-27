@@ -10,12 +10,12 @@ import harness
 text$ = "RenkuBASIC clipboard test"
 clipboard copy text$
 
-got$ = clipboard paste
+got$ = clipboard paste$
 assert_str$(got$, text$, "clipboard round trip")
 
 // Overwriting the clipboard replaces the content.
 clipboard copy "second value"
-assert_str$(clipboard paste, "second value", "clipboard keeps the latest value")
+assert_str$(clipboard paste$, "second value", "clipboard keeps the latest value")
 
 print "g0118 done"
 exit 0

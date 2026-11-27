@@ -777,6 +777,100 @@ void rk_yab_command(struct command *cmd) {
     expect(rk_yab_treebox(x1, y1, x2, y2, id, bars, view));
     break;
   }
+  case cYABMENU: {
+    char *view = take_string();
+    char *shortcut = take_string();
+    char *item = take_string();
+    char *head = take_string();
+
+    expect(rk_yab_menu(head, item, shortcut, view));
+    break;
+  }
+  case cYABMENURADIO: {
+    char *view = take_string();
+    int radio = (int)take_number();
+    char *head = take_string();
+
+    expect(rk_yab_menu_radio(head, radio, view));
+    break;
+  }
+  case cYABMENUOPTION: {
+    char *view = take_string();
+    char *option = take_string();
+    char *item = take_string();
+    char *head = take_string();
+
+    expect(rk_yab_menu_option(head, item, option, view));
+    break;
+  }
+  case cYABSUBMENU: {
+    char *view = take_string();
+    char *shortcut = take_string();
+    char *subitem = take_string();
+    char *item = take_string();
+    char *head = take_string();
+
+    expect(rk_yab_submenu(head, item, subitem, shortcut, view));
+    break;
+  }
+  case cYABSUBMENURADIO: {
+    char *view = take_string();
+    int radio = (int)take_number();
+    char *item = take_string();
+    char *head = take_string();
+
+    expect(rk_yab_submenu_radio(head, item, radio, view));
+    break;
+  }
+  case cYABSUBMENUOPTION: {
+    char *view = take_string();
+    char *option = take_string();
+    char *subitem = take_string();
+    char *item = take_string();
+    char *head = take_string();
+
+    expect(rk_yab_submenu_option(head, item, subitem, option, view));
+    break;
+  }
+  case cYABSUBSUBMENU: {
+    char *view = take_string();
+    char *shortcut = take_string();
+    char *subsubitem = take_string();
+    char *subitem = take_string();
+    char *item = take_string();
+    char *head = take_string();
+
+    expect(rk_yab_subsubmenu(head, item, subitem, subsubitem, shortcut, view));
+    break;
+  }
+  case cYABSUBSUBMENURADIO: {
+    char *view = take_string();
+    int radio = (int)take_number();
+    char *subitem = take_string();
+    char *item = take_string();
+    char *head = take_string();
+
+    expect(rk_yab_subsubmenu_radio(head, item, subitem, radio, view));
+    break;
+  }
+  case cYABSUBSUBMENUOPTION: {
+    char *view = take_string();
+    char *option = take_string();
+    char *subsubitem = take_string();
+    char *subitem = take_string();
+    char *item = take_string();
+    char *head = take_string();
+
+    expect(
+        rk_yab_subsubmenu_option(head, item, subitem, subsubitem, option, view));
+    break;
+  }
+  case cYABCLIPBOARDCOPY: {
+    char *text = take_string();
+
+    expect(rk_yab_clipboard_copy(text));
+    break;
+  }
   case cYABTREEADD: {
     char *item = take_string();
     char *id = take_string();

@@ -264,6 +264,11 @@ SPLITVIEW {BEGIN(YABKEY);return tSPLITVIEW;}
 STACKVIEW {BEGIN(YABKEY);return tSTACKVIEW;}
 CANVAS {BEGIN(YABKEY);return tCANVAS;}
 REGION {BEGIN(YABKEY);return tREGION;}
+MENU {BEGIN(YABKEY);return tMENU;}
+SUBMENU {BEGIN(YABKEY);return tSUBMENU;}
+SUBSUBMENU {BEGIN(YABKEY);return tSUBSUBMENU;}
+CLIPBOARD {BEGIN(YABKEY);return tCLIPBOARD;}
+"TRANSLATE$" return tTRANSLATE;
 LISTBOX {BEGIN(YABKEY);return tLISTBOX;}
 DROPBOX {BEGIN(YABKEY);return tDROPBOX;}
 TREEBOX {BEGIN(YABKEY);return tTREEBOX;}
@@ -282,6 +287,11 @@ COLORCONTROL {BEGIN(YABKEY);return tCOLORCONTROL;}
 <YABKEY>EXPAND/[ \t] {BEGIN(INITIAL);return tEXPAND;}
 <YABKEY>COLLAPSE/[ \t] {BEGIN(INITIAL);return tCOLLAPSE;}
 <YABKEY>COLUMN/[ \t] {BEGIN(INITIAL);return tCOLUMN;}
+  /* `clipboard copy` and `clipboard paste$`; yab spells the getter with the
+     dollar, and both words are only keywords after `clipboard`. */
+<YABKEY>COPY {BEGIN(INITIAL);return tCOPY;}
+<YABKEY>"PASTE$" {BEGIN(INITIAL);return tPASTE;}
+<YABKEY>"TRANSLATE$" {BEGIN(INITIAL);return tTRANSLATE;}
   /* yab's get$ returns text, get a number. Both stay available: the text
      getters use get$, the numeric ones (item counts, the selected position,
      colour components) use get, and `textcontrol get`/`textedit get` keep the

@@ -34,12 +34,14 @@
 #include <Box.h>
 #include <Button.h>
 #include <CheckBox.h>
+#include <Clipboard.h>
 #include <ColorControl.h>
 #include <File.h>
 #include <Font.h>
 #include <ListItem.h>
 #include <ListView.h>
 #include <Menu.h>
+#include <MenuBar.h>
 #include <MenuField.h>
 #include <MenuItem.h>
 #include <Message.h>
@@ -100,6 +102,7 @@ struct YabWindow {
   float width;
   float height;
   uint32 resize_mode; /* what `layout` set; applied to new widgets */
+  BView *menubar; /* the window's menu bar, created by the first `menu` */
   YabWindow *next;
 };
 
@@ -1542,6 +1545,7 @@ int rk_yab_window_open(double x1, double y1, double x2, double y2,
   entry->width = width;
   entry->height = height;
   entry->resize_mode = B_FOLLOW_LEFT | B_FOLLOW_TOP;
+  entry->menubar = NULL;
   entry->next = NULL;
 
   BRect frame_rect((float)x1, (float)y1, (float)x2, (float)y2);
@@ -4204,6 +4208,547 @@ int rk_yab_colorcontrol_get(const char *id, const char *option) {
     return 0;
   }
   return value;
+}
+
+/* ---- menus ------------------------------------------------------------- */
+
+/* yab keeps one menu bar per window, named "menubar", inside the view its menu
+   commands name. RenkuBASIC keeps one per window as well, at the top of the
+   window's display view, and creates it with the first menu command. The
+   caller holds the window lock, because every menu command changes the bar. */
+BMenuBar *window_menubar(YabWindow *window) {
+  BMenuBar *bar;
+
+  if (!window) {
+    set_error("menu: the window is not open");
+    return NULL;
+  }
+  if (window->menubar) {
+    return (BMenuBar *)window->menubar;
+  }
+  bar = new BMenuBar(BRect(0.0f, 0.0f, window->width - 1.0f, 0.0f), "menubar");
+  bar->SetResizingMode(B_FOLLOW_LEFT_RIGHT | B_FOLLOW_TOP);
+  window->display->AddChild(bar);
+  bar->ResizeToPreferred();
+  bar->ResizeTo(window->width - 1.0f, bar->Bounds().Height());
+  window->menubar = bar;
+  return bar;
+}
+
+BMenuItem *find_menu_item(BMenu *menu, const char *label) {
+  for (int32 i = 0; menu && i < menu->CountItems(); i++) {
+    BMenuItem *item = menu->ItemAt(i);
+    if (item && item->Label() && label && strcmp(item->Label(), label) == 0) {
+      return item;
+    }
+  }
+  return NULL;
+}
+
+/* The named submenu, created on first use. A plain item with that label is
+   replaced by the submenu, which is what yab's SubMenu does. */
+BMenu *ensure_menu(BMenu *parent, const char *label) {
+  int32 index = -1;
+  BMenu *menu;
+
+  if (!parent) {
+    set_error("menu: the menu bar is gone");
+    return NULL;
+  }
+  for (int32 i = 0; i < parent->CountItems(); i++) {
+    BMenuItem *item = parent->ItemAt(i);
+    if (item && item->Label() && label && strcmp(item->Label(), label) == 0) {
+      if (item->Submenu()) {
+        return item->Submenu();
+      }
+      index = i;
+      break;
+    }
+  }
+  menu = new BMenu(label ? label : "");
+  if (index >= 0) {
+    BMenuItem *plain = parent->RemoveItem(index);
+    delete plain;
+    parent->AddItem(menu, index);
+  } else {
+    parent->AddItem(menu);
+  }
+  return menu;
+}
+
+/* yab's shortcut string: the last character is the key, and an `s`, `c` or `o`
+   before it adds shift, control or option (case-insensitively, as yab's
+   BString::IFindFirst does). */
+void apply_shortcut(BMenuItem *item, const char *shortcut) {
+  uint32 modifiers = 0;
+  char key;
+
+  if (!item || !shortcut || !*shortcut) {
+    return;
+  }
+  BString spec(shortcut);
+  if (spec.Length() > 1) {
+    key = shortcut[spec.Length() - 1];
+    if (spec.IFindFirst("s") >= 0 && spec.IFindFirst("s") < spec.Length() - 1) {
+      modifiers |= B_SHIFT_KEY;
+    }
+    if (spec.IFindFirst("c") >= 0 && spec.IFindFirst("c") < spec.Length() - 1) {
+      modifiers |= B_CONTROL_KEY;
+    }
+    if (spec.IFindFirst("o") >= 0 && spec.IFindFirst("o") < spec.Length() - 1) {
+      modifiers |= B_OPTION_KEY;
+    }
+  } else {
+    key = shortcut[0];
+  }
+  item->SetShortcut(key, modifiers);
+}
+
+/* 0 disable, 1 enable, 2 mark, 3 plain, 4 remove, -1 unknown; yab tests the
+   options in this order and the last one that matches wins. */
+int menu_action(const char *option) {
+  BString text(option ? option : "");
+  int action = -1;
+
+  if (text.IFindFirst("disable") >= 0) action = 0;
+  if (text.IFindFirst("enable") >= 0) action = 1;
+  if (text.IFindFirst("mark") >= 0) action = 2;
+  if (text.IFindFirst("plain") >= 0) action = 3;
+  if (text.IFindFirst("remove") >= 0) action = 4;
+  return action;
+}
+
+int apply_menu_action(BMenu *menu, BMenuItem *item, int action) {
+  switch (action) {
+    case 0:
+      item->SetEnabled(false);
+      return 1;
+    case 1:
+      item->SetEnabled(true);
+      return 1;
+    case 2:
+      item->SetMarked(true);
+      return 1;
+    case 3:
+      item->SetMarked(false);
+      return 1;
+    case 4:
+      menu->RemoveItem(item);
+      delete item;
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+/* The menu a command names, created as needed: the top level one and then one
+   level per label that is not NULL. */
+BMenu *menu_path(BMenuBar *bar, const char *head, const char *item,
+                 const char *subitem) {
+  BMenu *menu = ensure_menu(bar, head);
+
+  if (menu && item) {
+    menu = ensure_menu(menu, item);
+  }
+  if (menu && subitem) {
+    menu = ensure_menu(menu, subitem);
+  }
+  return menu;
+}
+
+const uint32 kYabMenuMessage = 'rkym';
+
+int lock_window(YabWindow *window) {
+  if (!window || !window->window) {
+    set_error("the window is not open");
+    return 0;
+  }
+  if (window->window->LockWithTimeout(100000) != B_OK) {
+    set_error("the window did not respond");
+    return 0;
+  }
+  return 1;
+}
+
+int rk_yab_menu(const char *head, const char *item, const char *shortcut,
+                const char *view_name) {
+  clear_error();
+  float dx = 0.0f;
+  float dy = 0.0f;
+  YabWindow *window = widget_host(view_name, &dx, &dy);
+  BMenuBar *bar;
+  BMenu *menu;
+  BMenuItem *entry;
+
+  if (!window) {
+    return 0;
+  }
+  (void)dx;
+  (void)dy;
+  if (!lock_window(window)) {
+    return 0;
+  }
+  bar = window_menubar(window);
+  menu = bar ? ensure_menu(bar, head) : NULL;
+  if (!menu) {
+    window->window->Unlock();
+    return 0;
+  }
+  if (item && strcmp(item, "--") == 0) {
+    menu->AddItem(new BSeparatorItem());
+  } else {
+    entry = new BMenuItem(item ? item : "", new BMessage(kYabMenuMessage));
+    apply_shortcut(entry, shortcut);
+    menu->AddItem(entry);
+  }
+  window->window->Unlock();
+  return 1;
+}
+
+int rk_yab_menu_radio(const char *head, int radio, const char *view_name) {
+  clear_error();
+  float dx = 0.0f;
+  float dy = 0.0f;
+  YabWindow *window = widget_host(view_name, &dx, &dy);
+  BMenuBar *bar;
+  BMenu *menu;
+
+  if (!window) {
+    return 0;
+  }
+  (void)dx;
+  (void)dy;
+  if (!lock_window(window)) {
+    return 0;
+  }
+  bar = window_menubar(window);
+  menu = bar ? ensure_menu(bar, head) : NULL;
+  if (menu) {
+    menu->SetRadioMode(radio != 0);
+  }
+  window->window->Unlock();
+  return menu ? 1 : 0;
+}
+
+int rk_yab_menu_option(const char *head, const char *item, const char *option,
+                       const char *view_name) {
+  clear_error();
+  float dx = 0.0f;
+  float dy = 0.0f;
+  YabWindow *window = widget_host(view_name, &dx, &dy);
+  BMenuBar *bar;
+  BMenu *menu;
+  BMenuItem *entry;
+  int action = menu_action(option);
+  int ok = 0;
+
+  if (!window) {
+    return 0;
+  }
+  (void)dx;
+  (void)dy;
+  if (action < 0) {
+    snprintf(g_error, sizeof(g_error), "menu set: '%s' is not an option",
+             option ? option : "");
+    return 0;
+  }
+  if (!lock_window(window)) {
+    return 0;
+  }
+  bar = window_menubar(window);
+  menu = bar ? ensure_menu(bar, head) : NULL;
+  entry = find_menu_item(menu, item);
+  if (menu && entry) {
+    ok = apply_menu_action(menu, entry, action);
+  }
+  window->window->Unlock();
+  if (!ok) {
+    snprintf(g_error, sizeof(g_error), "menu set: '%s' has no item '%s'",
+             head ? head : "", item ? item : "");
+    return 0;
+  }
+  return 1;
+}
+
+int rk_yab_submenu(const char *head, const char *item, const char *subitem,
+                   const char *shortcut, const char *view_name) {
+  clear_error();
+  float dx = 0.0f;
+  float dy = 0.0f;
+  YabWindow *window = widget_host(view_name, &dx, &dy);
+  BMenuBar *bar;
+  BMenu *menu;
+  BMenuItem *entry;
+
+  if (!window) {
+    return 0;
+  }
+  (void)dx;
+  (void)dy;
+  if (item && strcmp(item, "--") == 0) {
+    /* yab returns without a word: a separator cannot own a submenu. */
+    return 1;
+  }
+  if (!lock_window(window)) {
+    return 0;
+  }
+  bar = window_menubar(window);
+  menu = bar ? menu_path(bar, head, item, NULL) : NULL;
+  if (!menu) {
+    window->window->Unlock();
+    return 0;
+  }
+  if (subitem && strcmp(subitem, "--") == 0) {
+    menu->AddItem(new BSeparatorItem());
+  } else {
+    entry = new BMenuItem(subitem ? subitem : "", new BMessage(kYabMenuMessage));
+    apply_shortcut(entry, shortcut);
+    menu->AddItem(entry);
+  }
+  window->window->Unlock();
+  return 1;
+}
+
+int rk_yab_submenu_radio(const char *head, const char *item, int radio,
+                         const char *view_name) {
+  clear_error();
+  float dx = 0.0f;
+  float dy = 0.0f;
+  YabWindow *window = widget_host(view_name, &dx, &dy);
+  BMenuBar *bar;
+  BMenu *menu;
+
+  if (!window) {
+    return 0;
+  }
+  (void)dx;
+  (void)dy;
+  if (!lock_window(window)) {
+    return 0;
+  }
+  bar = window_menubar(window);
+  menu = bar ? menu_path(bar, head, item, NULL) : NULL;
+  if (menu) {
+    menu->SetRadioMode(radio != 0);
+  }
+  window->window->Unlock();
+  return menu ? 1 : 0;
+}
+
+int rk_yab_submenu_option(const char *head, const char *item,
+                          const char *subitem, const char *option,
+                          const char *view_name) {
+  clear_error();
+  float dx = 0.0f;
+  float dy = 0.0f;
+  YabWindow *window = widget_host(view_name, &dx, &dy);
+  BMenuBar *bar;
+  BMenu *menu;
+  BMenuItem *entry;
+  int action = menu_action(option);
+  int ok = 0;
+
+  if (!window) {
+    return 0;
+  }
+  (void)dx;
+  (void)dy;
+  if (action < 0) {
+    snprintf(g_error, sizeof(g_error), "submenu set: '%s' is not an option",
+             option ? option : "");
+    return 0;
+  }
+  if (!lock_window(window)) {
+    return 0;
+  }
+  bar = window_menubar(window);
+  menu = bar ? menu_path(bar, head, item, NULL) : NULL;
+  entry = find_menu_item(menu, subitem);
+  if (menu && entry) {
+    ok = apply_menu_action(menu, entry, action);
+  }
+  window->window->Unlock();
+  if (!ok) {
+    snprintf(g_error, sizeof(g_error),
+             "submenu set: '%s' has no item '%s'", item ? item : "",
+             subitem ? subitem : "");
+    return 0;
+  }
+  return 1;
+}
+
+int rk_yab_subsubmenu(const char *head, const char *item, const char *subitem,
+                      const char *subsubitem, const char *shortcut,
+                      const char *view_name) {
+  clear_error();
+  float dx = 0.0f;
+  float dy = 0.0f;
+  YabWindow *window = widget_host(view_name, &dx, &dy);
+  BMenuBar *bar;
+  BMenu *menu;
+  BMenuItem *entry;
+
+  if (!window) {
+    return 0;
+  }
+  (void)dx;
+  (void)dy;
+  if (item && strcmp(item, "--") == 0) {
+    return 1;
+  }
+  if (!lock_window(window)) {
+    return 0;
+  }
+  bar = window_menubar(window);
+  menu = bar ? menu_path(bar, head, item, subitem) : NULL;
+  if (!menu) {
+    window->window->Unlock();
+    return 0;
+  }
+  if (subsubitem && strcmp(subsubitem, "--") == 0) {
+    menu->AddItem(new BSeparatorItem());
+  } else {
+    entry = new BMenuItem(subsubitem ? subsubitem : "",
+                          new BMessage(kYabMenuMessage));
+    apply_shortcut(entry, shortcut);
+    menu->AddItem(entry);
+  }
+  window->window->Unlock();
+  return 1;
+}
+
+int rk_yab_subsubmenu_radio(const char *head, const char *item,
+                            const char *subitem, int radio,
+                            const char *view_name) {
+  clear_error();
+  float dx = 0.0f;
+  float dy = 0.0f;
+  YabWindow *window = widget_host(view_name, &dx, &dy);
+  BMenuBar *bar;
+  BMenu *menu;
+
+  if (!window) {
+    return 0;
+  }
+  (void)dx;
+  (void)dy;
+  if (!lock_window(window)) {
+    return 0;
+  }
+  bar = window_menubar(window);
+  menu = bar ? menu_path(bar, head, item, subitem) : NULL;
+  if (menu) {
+    menu->SetRadioMode(radio != 0);
+  }
+  window->window->Unlock();
+  return menu ? 1 : 0;
+}
+
+int rk_yab_subsubmenu_option(const char *head, const char *item,
+                             const char *subitem, const char *subsubitem,
+                             const char *option, const char *view_name) {
+  clear_error();
+  float dx = 0.0f;
+  float dy = 0.0f;
+  YabWindow *window = widget_host(view_name, &dx, &dy);
+  BMenuBar *bar;
+  BMenu *menu;
+  BMenuItem *entry;
+  int action = menu_action(option);
+  int ok = 0;
+
+  if (!window) {
+    return 0;
+  }
+  (void)dx;
+  (void)dy;
+  if (action < 0) {
+    snprintf(g_error, sizeof(g_error), "subsubmenu set: '%s' is not an option",
+             option ? option : "");
+    return 0;
+  }
+  if (!lock_window(window)) {
+    return 0;
+  }
+  bar = window_menubar(window);
+  menu = bar ? menu_path(bar, head, item, subitem) : NULL;
+  entry = find_menu_item(menu, subsubitem);
+  if (menu && entry) {
+    ok = apply_menu_action(menu, entry, action);
+  }
+  window->window->Unlock();
+  if (!ok) {
+    snprintf(g_error, sizeof(g_error),
+             "subsubmenu set: '%s' has no item '%s'", subitem ? subitem : "",
+             subsubitem ? subsubitem : "");
+    return 0;
+  }
+  return 1;
+}
+
+/* ---- clipboard and translation ----------------------------------------- */
+
+int rk_yab_clipboard_copy(const char *text) {
+  clear_error();
+  const char *copy = text ? text : "";
+
+  if (!be_clipboard || !be_clipboard->Lock()) {
+    set_error("clipboard copy: the clipboard is busy");
+    return 0;
+  }
+  be_clipboard->Clear();
+  BMessage *data = be_clipboard->Data();
+  if (!data) {
+    be_clipboard->Unlock();
+    set_error("clipboard copy: the clipboard has no data message");
+    return 0;
+  }
+  /* yab stores the text without its terminator and pastes it back by length. */
+  if (data->AddData("text/plain", B_MIME_TYPE, copy, (ssize_t)strlen(copy)) !=
+      B_OK) {
+    be_clipboard->Unlock();
+    set_error("clipboard copy: could not write the clipboard");
+    return 0;
+  }
+  be_clipboard->Commit();
+  be_clipboard->Unlock();
+  return 1;
+}
+
+const char *rk_yab_clipboard_paste(void) {
+  static BString text;
+
+  clear_error();
+  text.SetTo("");
+  if (be_clipboard && be_clipboard->Lock()) {
+    BMessage *clip = be_clipboard->Data();
+    const void *data = NULL;
+    ssize_t length = 0;
+    if (clip && clip->FindData("text/plain", B_MIME_TYPE, &data, &length) ==
+                    B_OK &&
+        data && length > 0) {
+      text.SetTo((const char *)data, (int32)length);
+    }
+    be_clipboard->Unlock();
+  }
+  return text.String();
+}
+
+/* RenkuBASIC ships no message catalogs, so a translation is the identifier
+   itself -- which is also what yab returns for a key its catalog does not
+   know, and what the `translate$` test asserts. */
+const char *rk_yab_translate(const char *text) {
+  static char result[4096];
+
+  clear_error();
+  snprintf(result, sizeof(result), "%s", text ? text : "");
+  return result;
+}
+
+const char *rk_yab_menu_translate(const char *text) {
+  /* yab splits a menu key on ':' and translates each part; with no catalog
+     every part keeps its text, so the key comes back unchanged. */
+  return rk_yab_translate(text);
 }
 
 } // extern "C"

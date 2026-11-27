@@ -283,6 +283,50 @@ int rk_yab_colorcontrol(double x, double y, const char *id,
 int rk_yab_colorcontrol_set(const char *id, int r, int g, int b);
 int rk_yab_colorcontrol_get(const char *id, const char *option);
 
+/* ---- menus and the clipboard ------------------------------------------ */
+
+/* `menu "head", "item", "shortcut", "view"`: adds an item to a top level menu,
+   creating the menu (and the window's menu bar) on first use. "--" is a
+   separator. The shortcut is yab's: its last character is the key and a `s`,
+   `c` or `o` before it adds shift, control or option. */
+int rk_yab_menu(const char *head, const char *item, const char *shortcut,
+                const char *view);
+/* `menu set "head", radio, "view"`: 1 makes the menu a radio group. */
+int rk_yab_menu_radio(const char *head, int radio, const char *view);
+/* `menu set "head", "item", "option", "view"`: the option is "disable",
+   "enable", "mark", "plain" or "remove", matched as yab matches it. */
+int rk_yab_menu_option(const char *head, const char *item, const char *option,
+                       const char *view);
+
+/* `submenu "head", "item", "subitem", "shortcut", "view"` and the two `set`
+   forms (`radio` for a radio group, `option` for an item's state). */
+int rk_yab_submenu(const char *head, const char *item, const char *subitem,
+                   const char *shortcut, const char *view);
+int rk_yab_submenu_radio(const char *head, const char *item, int radio,
+                         const char *view);
+int rk_yab_submenu_option(const char *head, const char *item,
+                          const char *subitem, const char *option,
+                          const char *view);
+
+/* `subsubmenu head, item, subitem, subsubitem, shortcut, view` and its `set`
+   forms, one level deeper. */
+int rk_yab_subsubmenu(const char *head, const char *item, const char *subitem,
+                      const char *subsubitem, const char *shortcut,
+                      const char *view);
+int rk_yab_subsubmenu_radio(const char *head, const char *item,
+                            const char *subitem, int radio, const char *view);
+int rk_yab_subsubmenu_option(const char *head, const char *item,
+                             const char *subitem, const char *subsubitem,
+                             const char *option, const char *view);
+
+/* `clipboard copy text$` and the `clipboard paste$` string function. */
+int rk_yab_clipboard_copy(const char *text);
+const char *rk_yab_clipboard_paste(void);
+
+/* `translate$(...)` and `menu translate$(...)`. */
+const char *rk_yab_translate(const char *text);
+const char *rk_yab_menu_translate(const char *text);
+
 /* ---- program helpers -------------------------------------------------- */
 
 /* Write the screen area x1,y1 to x2,y2 of the frontmost yab window as PNG.

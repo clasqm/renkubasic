@@ -23,7 +23,7 @@ next slices.
 | yab windows, views, drawing | `src/yabcompat/rk_yab.cpp` | done for the command set below |
 | yab widget controls, text, sliders, containers, `canvas`/`region` | `src/yabcompat/rk_yab.cpp` | done; the `gui-widgets` tests run |
 | yab lists, tree/column, calendar, colour control | `src/yabcompat/rk_yab.cpp` | done; the `gui-lists` tests run |
-| yab menus and clipboard | `src/yabcompat/` | not started; those tests ask for `gui-menus` |
+| yab menus, submenus and the clipboard | `src/yabcompat/rk_yab.cpp` | done; the `gui-menus` tests run |
 | yab bitmap | `src/yabcompat/` | not started; that test asks for `gui-bitmaps` |
 
 ## Design decisions
@@ -612,8 +612,55 @@ declared in the header but libbe defines it only inside its own subclass, so the
 row's fallback path paints a plain row with the standard list colours instead of
 calling it.
 
-What the next Haiku run has to show: `gui-lists : available`, `g0112`, `g0113`
-and `g0116` passing, and the earlier GUI tests unchanged.
+The round-9 Haiku run built clean: CLI 39 / 0 / 2, `gui-lists` probed as
+available, and `g0112` and `g0116` passed at once. `g0113` failed on
+`columnbox colour "rk_cols", "bgcolor"`, which is my test's spelling rather than
+yab's: yab matches the option case-insensitively anywhere in the string and only
+knows `selection-text`, `non-focus-selection`, `selection`, `text`,
+`row-divider` and `background`. The table had compared whole strings, so it also
+rejected yab's own `Filebox.yab` spellings (`Selection-Active`, `Row-Divider`);
+both are fixed, and the test asks for `background`. The rerun passed everything:
+GUI 14 / 0 / 3.
 
-Next slice: menus, the clipboard and `message$`; then `bitmap`, `attribute`,
-widget events, and the tab/box/split polish that the gaps list names.
+**Round 10 (2026-11-27).** Menus and the clipboard: `menu`, `submenu`,
+`subsubmenu` with their `set` forms (radio groups and the `disable`, `enable`,
+`mark`, `plain`, `remove` options), `clipboard copy`/`clipboard paste$`, and the
+`translate$`/`menu translate$` functions. Notes:
+
+* Each window gets one `BMenuBar`, created by the first menu command and kept
+  in the window's entry, with the menus and submenus under it. A label that is
+  already a plain item becomes a submenu when a `submenu` command names it, as
+  in yab's `SubMenu`.
+* The shortcut string is yab's: its last character is the key, and an `s`, `c`
+  or `o` before it adds shift, control or option. The menu options are matched
+  the way yab matches them, one substring test each, last match wins.
+* yab spells the clipboard getter `paste$` (its scanner matches the literal
+  `PASTE$`), so the test uses `clipboard paste$`; `copy` and `paste$` are
+  keywords only after `clipboard`, and `translate$` is a keyword on its own
+  because yab programs call it in expressions.
+* The clipboard holds `text/plain` without a terminator, exactly as yab stores
+  it, and paste reads it back by length.
+* RenkuBASIC ships no message catalogs, so `translate$` returns its identifier
+  unchanged; that is also what yab returns for a key its catalog does not know,
+  and it is what `g0117` asserts (an unknown identifier must not become empty).
+  `menu translate$` has the same answer, because with no catalog every `:`
+  separated part keeps its text.
+* `message$` and `attribute` are not part of this slice: they need a widget
+  event queue, which is the next slice's work, so a menu item's message is
+  posted to a `BMessage` nothing reads yet.
+
+Checked here (Linux, no app_server): the grammar regenerates with the expected
+six conflicts, so the menu productions add none; all C sources plus the stub
+bridges build and link; `g0117` and `g0118` run end to end against the stub, as
+do `g0112`, `g0113` and `g0116`; a scratch program exercises every menu form,
+`menu translate$` and `clipboard paste$`; the CLI suite stays at 35 / 0 / 6; and
+`rk_yab.cpp` passes `g++ -fsyntax-only` against Haiku's public headers. Not
+checked: anything on app_server. No menu bar has been drawn or opened, and no
+item has been clicked, so layout of the bar, submenu placement and the radio and
+check marks are the next run's business.
+
+What the next Haiku run has to show: `gui-menus : available`, `g0117` and
+`g0118` passing, and the earlier GUI tests unchanged.
+
+Next slice: `bitmap`; then `attribute`, `message$` and widget events; then the
+tab/box/split polish that the gaps list names.
