@@ -5733,12 +5733,22 @@ const char *rk_yab_filepanel(const char *mode, const char *title,
     }
     return result.c_str();
   }
+  panel_trace("filepanel: the application is running");
   YabFilePanelLooper *looper = new YabFilePanelLooper();
-  if (looper->Run() != B_OK) {
+  /* BLooper::Run() answers with the thread it started, not a status: a panel
+     looper on its way is a positive thread id, and only a negative value is a
+     failure. Comparing it with B_OK read every success as a failure, and
+     deleting a looper whose thread is running is a debugger() call: that
+     suspends the whole program with no message, which looked exactly like a
+     panel that never answered. */
+  thread_id looper_thread = looper->Run();
+  if (looper_thread < B_OK) {
+    panel_trace("filepanel: the panel's message looper did not start");
     delete looper;
     set_error("filepanel: could not start the panel");
     return result.c_str();
   }
+  panel_trace("filepanel: the panel's message looper is running");
   /* The panel reports with its own default messages -- B_REFS_RECEIVED for an
      opened file and B_SAVE_REQUESTED for a saved one -- which is what yab
      relies on by passing none of its own. The messenger is copied by the
@@ -5749,6 +5759,7 @@ const char *rk_yab_filepanel(const char *mode, const char *title,
      and this function then waits for an answer that never comes. */
   BFilePanel *panel = new BFilePanel(panel_mode, &messenger, NULL, flavours,
                                      false, NULL, NULL, true, true);
+  panel_trace("filepanel: the panel is created");
   /* BFilePanel has no title of its own; the title yab shows is its panel
      window's, and its own class sets exactly that. */
   if (title && *title && panel->Window() != NULL) {
@@ -5762,6 +5773,7 @@ const char *rk_yab_filepanel(const char *mode, const char *title,
   if (panel_mode == B_SAVE_PANEL && filename && *filename) {
     panel->SetSaveText(filename);
   }
+  panel_trace("filepanel: the panel is set up");
   panel->Show();
   panel_trace("filepanel: the panel is open");
   panel_trace_window("after Show()", panel->Window());

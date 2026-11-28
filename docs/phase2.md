@@ -1159,5 +1159,18 @@ screen; "not hidden" with a sensible frame followed by no answer means the
 panel was there and nothing was pressed on it. The wait itself is unchanged
 and still blocks the program.
 
+The next run printed none of those lines, not even the old "the panel is open"
+one, so the panel was never shown and the wait was never entered: the function
+stopped before `Show()`. Its start-up had checked `looper->Run() != B_OK`, and
+`BLooper::Run()` answers with the thread it started -- a positive thread id --
+not a status, so every successful start read as a failure. The error branch
+then deleted a looper whose thread was running, and that is a `debugger()`
+call in `BLooper`'s destructor: the program is suspended there, silently, with
+no message and no output, which is indistinguishable from the hang it was
+supposed to report. The check is now `looper_thread < B_OK`. The function also
+traces its start-up steps -- the application is running, the panel's message
+looper is running, the panel is created, the panel is set up -- so a future
+stop before `Show()` lands on one of those lines instead of on nothing.
+
 Next slice: `mouse message$` and `keyboard message$`, which now have a queue to
 feed.
