@@ -241,11 +241,16 @@ like `rk_gui_save_png()`.
 * **The dialogs cover yab's common forms.** `alert text$, button$, icon$` is a
   command; yab's five-argument alert *function* (three buttons, returning the
   number of the button pressed) needs five arguments, and the interpreter's
-  function dispatch stops at four. `filepanel` takes the mode, the title and the
-  starting directory, but not yab's fourth argument, the name a save panel
-  starts with: after the third string a ',' is ambiguous with the end of the
-  argument list, which would cost a seventh shift/reduce conflict. `BFilePanel`
-  has no title of its own, so the title is accepted and unused. `popupmenu`
+  function dispatch stops at four. `filepanel` takes all four of yab's
+  arguments: the mode, the title, the starting directory and the suggested name
+  a save panel starts with. That fourth argument is compulsory -- yab made it
+  so in 1.7, and current programs pass it even when it is empty -- and it is
+  only handed to the panel when the mode saves. yab's older three-argument form
+  is not accepted: side by side the two rules are ambiguous at the ',' after
+  the third argument, which would be a seventh shift/reduce conflict, and the
+  grammar is pinned at six; bison's answer to the ambiguity (shift) is the
+  four-argument reading, so that is the form the language keeps. The title goes
+  on the panel's own window, which is how yab sets it. `popupmenu`
   returns the chosen label; yab offers shortcuts and icons in it, which are not
   built here.
 * **Only the widget properties the tests need exist.** `option set` knows
@@ -971,27 +976,31 @@ for a round of their own. Notes:
   dismissed. "--" is a separator, as in yab. The window is locked only long
   enough to convert the point to screen coordinates, so the menu's own loop is
   never run under the window lock.
-* `filepanel mode$, title$, directory$` returns the chosen path or "" when the
-  panel was cancelled. `BFilePanel` only reports by message, so the target is a
-  looper of our own that records the path and releases a semaphore the caller
-  waits on; `B_CANCEL` releases it with an empty answer. The mode is yab's,
-  matched by substring with the longest form first, so "Load-File-and-Directory"
-  is not read as "Load-File".
+* `filepanel mode$, title$, directory$, filename$` returns the chosen path or
+  "" when the panel was cancelled. `BFilePanel` only reports by message, so the
+  target is a looper of our own that records the path and releases a semaphore
+  the caller waits on; `B_CANCEL` releases it with an empty answer. The mode is
+  yab's, matched by substring with the longest form first, so
+  "Load-File-and-Directory" is not read as "Load-File". The fourth argument is
+  the name a save panel starts with; it is `SetSaveText` for a save and unused
+  for the other modes, as in yab.
 * The three of them start the application themselves, because a program may
   raise an alert before it opens a window.
-* Two yab forms are not in the grammar, both for the same reason: they would
-  mean a seventh shift/reduce conflict (the grammar is pinned at six). yab's
-  five-argument `alert` *function* (`alert text, b1, b2, b3, icon` returning the
-  button number) needs five arguments and the interpreter's function dispatch
-  stops at four. yab's four-argument `filepanel` (the name a save panel starts
-  with) puts a ',' where the three-argument form reduces, so it is genuinely
-  ambiguous; `popupmenu` and the two `filepanel` forms above are unaffected.
-  See the gaps list.
+* yab's five-argument `alert` *function* (`alert text, b1, b2, b3, icon`
+  returning the button number) is not in the grammar: it needs five arguments
+  and the interpreter's function dispatch stops at four. Its older
+  three-argument `filepanel` is not in the grammar either, for a different
+  reason -- side by side with the four-argument rule the ',' after the third
+  argument is genuinely ambiguous, a seventh shift/reduce conflict -- and the
+  four-argument form is the one current programs pass anyway. See the gaps
+  list.
 
 Checked here (Linux, no app_server): the grammar regenerates with the same six
-conflicts (the four-argument `filepanel` rule was tried and removed for this
-reason); all C sources plus the stub bridges build and link; a probe script with
-`alert`, both `filepanel` forms and `popupmenu` parses and runs against the stub
+conflicts (the three-argument `filepanel` rule was tried beside the four-
+argument one and removed for this reason, and giving ',' a precedence to state
+that shift resolves it silently resolved three of the pinned six, so that way
+is closed too); all C sources plus the stub bridges build and link; a probe
+script with `alert`, `filepanel` and `popupmenu` parses and runs against the stub
 (which answers 1 and ""); the CLI suite stays at 35 / 0 / 7; `g0122` still runs
 green; and `rk_yab.cpp` passes `g++ -fsyntax-only` against Haiku's public
 headers, which is where `BAlert`, `BFilePanel`, `BPopUpMenu::Go` and the
@@ -1095,11 +1104,29 @@ The other two manual tests failed inside the tests, not the interpreter:
   its window": the window was 180 pixels tall and the buttons end at y = 209,
   so it is now 240 pixels tall (200, 200 to 420, 440), the same fix `m0102`
   needed.
-* `m0101-filepanel-popupmenu` stopped at its load panel, which still passed a
-  fourth argument (""); only yab's three-argument `filepanel` has a rule here,
-  so that call now uses the three-argument form as the save branch already did.
+* `m0101-filepanel-popupmenu` stopped at its load panel, which passed yab's
+  four-argument form. That is the form the language now has -- the fourth
+  argument is compulsory since yab 1.7, so current programs all pass it, even
+  empty -- and the test keeps it in both branches.
   Pressing each of its three buttons, and each of `m0100`'s six, is still a
   human check.
+
+The first Haiku run of the three dialogs then showed `m0100-alerts` passing
+(its window had been too short for its own buttons) and `m0101` hanging until
+the runner's 300-second timeout, with only "application ready" on stderr. Two
+things in the panel did not match yab and are fixed:
+
+* the panel was given a `B_REFS_RECEIVED` message of our own, which is the open
+  panel's result but not the save panel's: a save reports `B_SAVE_REQUESTED`
+  with a directory and a name. The panel now gets no message of its own, so it
+  sends the default one for its mode, and the waiting looper joins a saved
+  directory and name into a path the way yab's looper does. `m0101` exercised
+  both panels, so the save result was wrong however the load step behaved.
+* the title argument was dropped as unusable; it is the panel window's title,
+  which is what yab's own panel class sets, so it is set here too.
+
+`m0101` now prints a line before and after each panel and the popup, so a hang
+in the next run names the call it stopped in instead of only timing out.
 
 Next slice: `mouse message$` and `keyboard message$`, which now have a queue to
 feed.

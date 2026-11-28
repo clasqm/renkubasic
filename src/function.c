@@ -984,10 +984,9 @@ void function(struct command *cmd) /* performs a function */
     rk_yab_check();
     result = stSTRING;
     break;
-  case fYABFILEPANELLOAD:
-    pointer =
-        my_strdup((char *)rk_yab_filepanel(a1->pointer, a2->pointer,
-                                           a3->pointer, ""));
+  case fYABFILEPANEL:
+    pointer = my_strdup((char *)rk_yab_filepanel(
+        a1->pointer, a2->pointer, a3->pointer, a4->pointer));
     rk_yab_check();
     result = stSTRING;
     break;

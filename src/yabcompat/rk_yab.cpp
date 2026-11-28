@@ -5644,6 +5644,22 @@ public:
       release_sem(waiting);
       return;
     }
+    /* A save panel does not report a reference: it reports the directory and
+       the typed name, which is the pair yab's looper joins too. */
+    if (message->what == B_SAVE_REQUESTED) {
+      const char *name = NULL;
+      entry_ref directory_ref;
+      if (message->FindString("name", &name) == B_OK && name != NULL &&
+          message->FindRef("directory", &directory_ref) == B_OK) {
+        BEntry entry(&directory_ref, name);
+        BPath path(&entry);
+        if (path.InitCheck() == B_OK) {
+          chosen = path.Path();
+        }
+      }
+      release_sem(waiting);
+      return;
+    }
     if (message->what == B_CANCEL) {
       release_sem(waiting);
       return;
@@ -5683,23 +5699,29 @@ const char *rk_yab_filepanel(const char *mode, const char *title,
     }
     return result.c_str();
   }
-  /* BFilePanel has no title of its own; yab's title argument comes from its
-     own panel class, so it is accepted and unused here. */
-  (void)title;
-
   YabFilePanelLooper *looper = new YabFilePanelLooper();
   if (looper->Run() != B_OK) {
     delete looper;
     set_error("filepanel: could not start the panel");
     return result.c_str();
   }
+  /* The panel reports with its own default messages -- B_REFS_RECEIVED for an
+     opened file and B_SAVE_REQUESTED for a saved one -- which is what yab
+     relies on by passing none of its own. The messenger is copied by the
+     panel, as the header's by-value Messenger() shows. */
   BMessenger messenger(looper);
-  BFilePanel *panel =
-      new BFilePanel(panel_mode, &messenger, NULL, flavours, false,
-                     new BMessage(B_REFS_RECEIVED), NULL, false, true);
+  BFilePanel *panel = new BFilePanel(panel_mode, &messenger, NULL, flavours,
+                                     false, NULL, NULL, false, true);
+  /* BFilePanel has no title of its own; the title yab shows is its panel
+     window's, and its own class sets exactly that. */
+  if (title && *title && panel->Window() != NULL) {
+    panel->Window()->SetTitle(title);
+  }
   if (directory && *directory) {
     panel->SetPanelDirectory(directory);
   }
+  /* The suggested name is compulsory in the language now, but only a save
+     panel has a use for it. */
   if (panel_mode == B_SAVE_PANEL && filename && *filename) {
     panel->SetSaveText(filename);
   }

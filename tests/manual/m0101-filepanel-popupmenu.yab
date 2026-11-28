@@ -30,25 +30,27 @@ while running
   msg$ = message$
   switch msg$
     case "rk_panel_load|"
-      // Only yab's three-argument form has a grammar rule (see the gaps list),
-      // so the panel starts in the directory given and with no name.
-      chosen$ = filepanel "Load-File", "Choose a file", "/boot/home"
+      print "step: load panel"
+      chosen$ = filepanel "Load-File", "Choose a file", "/boot/home", ""
+      print "chosen: [" + chosen$ + "]"
       if chosen$ <> "" then
         draw flush "rk_panel_view"
         draw text 10, 40, "loaded: " + chosen$, "rk_panel_view"
       endif
       break
     case "rk_panel_save|"
-      // yab's fourth argument (the name the panel starts with) has no grammar
-      // rule here yet, so the save panel opens with an empty name.
-      chosen$ = filepanel "Save-File", "Choose a target", "/boot/home"
+      print "step: save panel"
+      chosen$ = filepanel "Save-File", "Choose a target", "/boot/home", ""
+      print "target: [" + chosen$ + "]"
       if chosen$ <> "" then
         draw flush "rk_panel_view"
         draw text 10, 60, "target: " + chosen$, "rk_panel_view"
       endif
       break
     case "rk_panel_popup|"
+      print "step: popup"
       pick$ = popupmenu 10, 210, "Foo|--|Bar|Baz", "rk_panel_win"
+      print "picked: [" + pick$ + "]"
       if pick$ <> "" then
         draw flush "rk_panel_view"
         draw text 10, 75, "picked: " + pick$, "rk_panel_view"

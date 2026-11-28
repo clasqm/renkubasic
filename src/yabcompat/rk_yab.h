@@ -400,13 +400,13 @@ int rk_yab_notice(const char *text, const char *button, const char *icon);
 const char *rk_yab_popupmenu(double x, double y, const char *items,
                              const char *view);
 
-/* `filepanel mode$, title$, directory$`: the path the user chose, or "" when
-   the panel was cancelled. The mode is yab's, matched as a word anywhere in
-   the string: "Load-File", "Save-File", "Load-Directory" or
+/* `filepanel mode$, title$, directory$, filename$`: the path the user chose, or
+   "" when the panel was cancelled. The mode is yab's, matched as a word
+   anywhere in the string: "Load-File", "Save-File", "Load-Directory" or
    "Load-File-and-Directory". `filename` is the name a save panel starts with;
-   the grammar has no fourth argument for it (see docs/phase2.md), so it passes
-   "". The title is accepted and unused, because BFilePanel has no title of its
-   own. The string is owned by the bridge until the next call. */
+   it is compulsory in the language and unused for the other modes. The title
+   goes on the panel's own window, which is what yab titles. The string is owned
+   by the bridge until the next call. */
 const char *rk_yab_filepanel(const char *mode, const char *title,
                              const char *directory, const char *filename);
 
