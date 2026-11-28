@@ -1322,3 +1322,27 @@ coordinates when the message is delivered to it.
 
 The next slice is still yab's `window clear "id"`, which deletes a whole view
 tree and is unparsed here, and `view scale`.
+
+The run of that commit came with a screenshot of `m0105`, and it shows the
+problem: the view is there, correctly placed and correctly sized, but it is
+plain black with no text, so there was never a yellow area to drag onto.
+
+Black is zeroed memory, which means the view's canvas had no pixels in it at all
+when the frame was composited. Drawing into a bitmap that has a child view goes
+through app_server, and the connection is buffered: the BeBook's BBitmap chapter
+says the views "never get update messages telling them to draw" so nothing
+flushes the buffer for them, and `Sync()` "is the only way you can be sure the
+image has been completely rendered before you attempt to draw with it". The
+bitmap code in this file already calls `BView::Sync()` for that reason
+(`draw bitmap`, `bitmap get`), but `refresh_window()` copied the canvas bits
+without it, so it read the canvas as it was before the pending drawing ran.
+
+`refresh_window()` now syncs each view before copying it. The `rk_gui` layer has
+the same pattern in `sync_frame()`; it is less visible there only because every
+graphics primitive flushes separately, so at worst the most recent primitive is
+one step behind on screen. Worth fixing the same way when the graphics layer is
+next touched.
+
+This is the second thing the screenshot settled: the view really is composited
+at its rectangle, which was the part of `view remove` that the remove-then-white
+behaviour could not distinguish from "the view was never drawn".

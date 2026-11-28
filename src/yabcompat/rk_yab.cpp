@@ -532,6 +532,10 @@ bool refresh_window(YabWindow *window) {
   for (int i = 0; i < count; i++) {
     YabView *view = visible[i];
     view->canvas->Lock();
+    /* The canvas is a bitmap with a child view, so its drawing happens in
+       app_server: without this the bits below are whatever was there before
+       the last drawing call, which is all zeroes on a fresh canvas. */
+    view->view->Sync();
     copy_pixels(view->canvas, 0, 0, window->frame, (int)view->rect.left,
                 (int)view->rect.top, (int)(view->rect.Width() + 1.0f),
                 (int)(view->rect.Height() + 1.0f));
