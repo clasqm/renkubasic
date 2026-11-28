@@ -1290,3 +1290,35 @@ and prints the file's path, that the removed view's pixels disappear, and that
 
 Next slice: yab's `window clear "id"`, which deletes a whole view tree and is
 still unparsed here, and `view scale`.
+
+The Haiku run of that commit built cleanly and passed everything it already
+passed: CLI 40 passed, 0 failed, 2 skipped; GUI 20 passed, 0 failed, so
+`g0115-views` now also removes a view and creates it again under the same name
+without complaint, which is the script-checkable half of `view remove`. The
+manual suite ran `m0100` through `m0105` and all six passed. `m0105` printed
+
+```
+message: [rk_drop_win:_Activated|]
+message: [rk_drop_remove|]
+view removed
+message: [rk_drop_done|]
+m0105 done
+```
+
+so the remove path works on a real app_server: the button message arrives, the
+statement runs, the view is gone by the time the window repaints, and no
+`message$` follows the removal. What the output does *not* contain is a
+`_Dropped` line: the whole run is only five lines, not a ten-line window, so no
+drop was reported before the removal. Either the drag was not made on that run
+or `B_SIMPLE_DATA` is not reaching the display view. Until a run shows
+`message: [rk_drop_view:_Dropped:/boot/...]`, the drop half of the slice is
+unproven and stays a human check: drag a file onto the yellow area and press
+Done before Remove view.
+
+If a drag still reports nothing, the next thing to look at is whether the
+display view accepts the drag at all -- whether `MessageReceived` sees
+`B_SIMPLE_DATA`, and whether `DropPoint()` is already in the display view's
+coordinates when the message is delivered to it.
+
+The next slice is still yab's `window clear "id"`, which deletes a whole view
+tree and is unparsed here, and `view scale`.
