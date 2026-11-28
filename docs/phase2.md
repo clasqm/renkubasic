@@ -1172,5 +1172,17 @@ traces its start-up steps -- the application is running, the panel's message
 looper is running, the panel is created, the panel is set up -- so a future
 stop before `Show()` lands on one of those lines instead of on nothing.
 
+That fix was the whole failure. The next Haiku run passed `m0101`: the load
+panel returned a file, the save panel a target, and the popup menu a choice
+(`picked: [Baz]` after an empty first attempt, which is a dismissed menu and
+not a failure). The trace shows the panel window not hidden, with a frame on
+screen, before and after the answer -- exactly what the two probes were added
+to distinguish. The full run is green: CLI 40 passed, 0 failed, 2 skipped (ffi
+and pty); GUI 20 passed; `m0100` to `m0103` all pass.
+
+Two things about the panel are still only human checks: pressing each of
+`m0100`'s six alert buttons and of `m0101`'s three buttons, and confirming that
+a dismissed panel leaves the view unchanged.
+
 Next slice: `mouse message$` and `keyboard message$`, which now have a queue to
 feed.
