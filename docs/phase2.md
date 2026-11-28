@@ -947,6 +947,12 @@ passing as well as `g0121-messages`, and the CLI suite unchanged at 40 / 0 / 2.
 The run that accepted round 13 was built before this round, so it did not
 include `g0122`; the two rounds are checked together next time.
 
+Accepted on Haiku (2026-11-28, commit `361cac6`): GUI **19 / 0 / 0** with
+`g0122-containers` passing -- the split view's bar does move its panes on real
+app_server -- and CLI **40 / 0 / 2**. That build is the merge before rounds 15
+and 16, so its manual suite still fails the two dialog tests at a syntax error
+and `m0102` at the short window; all three are fixed after it (`ea6187a`).
+
 **Round 15 (2026-11-28).** The three dialogs: `alert`, `popupmenu` and
 `filepanel`.
 
