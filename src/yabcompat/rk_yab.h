@@ -362,6 +362,16 @@ const char *rk_yab_menu_translate(const char *text);
 /* `message$`: every widget event collected since the last call. */
 const char *rk_yab_message(void);
 
+/* `mouse message$(view$)`: the pointer over that view as yab spells it,
+   "x:y:left:middle:right", with the position in the view's own coordinates.
+   The state belongs to the view, so it is the last position seen inside it. */
+const char *rk_yab_mouse_message(const char *view);
+
+/* `keyboard message$(view$)`: the key that is down while that view has the
+   keyboard -- yab's modifier and key names, an ordinary key standing for
+   itself -- and "" once it is released or when the view has no keyboard. */
+const char *rk_yab_keyboard_message(const char *view);
+
 /* ---- audio ------------------------------------------------------------- */
 
 /* `sound play path$, loop` starts a file through the game kit; `loop` other

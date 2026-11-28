@@ -223,15 +223,25 @@ like `rk_gui_save_png()`.
   buttons, because Haiku has no spinner; `textedit` wraps but has no scrollbars
   yet; and `texturl` keeps its link as a tool tip, since there is no URL
   handler.
-* **`message$` reports yab's widget events, with two families still open.**
-  Buttons, check boxes, radio buttons, text controls, sliders, colour
-  controls, the list family (selection and invocation), drop boxes, menus and
-  the window's own activation, deactivation and close request all append their
-  yab spelling to a per-window queue that `message$` drains. `mouse message$`
-  and `keyboard message$` are not implemented: they need mouse tracking and
-  keyboard focus messages per view, not the event queue. Dropped files
-  (`_Dropped`) are not reported either, because a yab view is an offscreen
-  bitmap here and never receives a drop.
+* **`message$` reports yab's widget events, and the two per-view getters read
+  the pointer and the keyboard.** Buttons, check boxes, radio buttons, text
+  controls, sliders, colour controls, the list family (selection and
+  invocation), drop boxes, menus and the window's own activation,
+  deactivation and close request all append their yab spelling to a per-window
+  queue that `message$` drains. `mouse message$` and `keyboard message$` are
+  not events on that queue: they read state, which is where yab keeps it too.
+  yab's views are real child views and the pointer and the keyboard reach them
+  directly; a RenkuBASIC view is an offscreen bitmap, so the window's display
+  view -- the only view the pointer reaches -- records the state on the named
+  view whose rectangle contains the pointer. `mouse message$` answers yab's
+  "x:y:left:middle:right" in the view's own coordinates, and `keyboard
+  message$` answers the key that is down while that view holds the keyboard,
+  in yab's modifier-and-key spelling, and "" once the key is released. Two
+  limits follow from that: the keyboard belongs to the view that was last
+  clicked, not to a child control that took the focus itself, and a view is
+  found by its rectangle, so the topmost of two overlapping views wins.
+  Dropped files (`_Dropped`) are not reported, because an offscreen bitmap
+  never receives a drop.
 * **The audio commands play one sound at a time.** `sound` uses the game kit,
   which plays WAV files (and loops them); `mediasound` plays whatever the media
   kit can decode, so its formats are the machine's decoders. There is no mixing
@@ -881,9 +891,12 @@ The third run was green: CLI 40 / 0 / 2, GUI unchanged at 17 / 0 / 0, with
 * `message$` posts nothing and never sleeps: events wait in the queue until the
   next call. That is a departure from yab, which snoozes 20 ms before it
   harvests, and it is what lets a program poll in a tight loop.
-* `mouse message$`, `keyboard message$` and dropped files are not part of this
-  slice (see the gaps list); the manual test no longer asks for the keyboard
-  form, which never parsed.
+* `mouse message$` and `keyboard message$` parse in both yab spellings, with
+  and without parentheses, because a parenthesised call is just the view
+  expression in parentheses -- which is how yab's own examples write it, and
+  why one rule each keeps the grammar's six conflicts. They read the state the
+  display view records on the view under the pointer (see the gaps list).
+  Dropped files are still not reported.
 
 Checked here (Linux, no app_server): the grammar regenerates with the same six
 conflicts; all C sources plus the stub bridges build and link; `print
@@ -1184,5 +1197,55 @@ Two things about the panel are still only human checks: pressing each of
 `m0100`'s six alert buttons and of `m0101`'s three buttons, and confirming that
 a dismissed panel leaves the view unchanged.
 
-Next slice: `mouse message$` and `keyboard message$`, which now have a queue to
-feed.
+The next slice is the two per-view event getters, `mouse message$` and
+`keyboard message$`. Neither is an event on the `message$` queue: in yab both
+read state that a view keeps, so they need the display view to record it on the
+view the conversation is about.
+
+* `mouse message$ view$` answers yab's "x:y:left:middle:right", the position in
+  the view's own coordinates and the three buttons as 1 or 0. The display view
+  is the only view the pointer reaches, so on every mouse message it finds the
+  named view whose rectangle contains the point and writes the four values
+there; a view that was never under the pointer answers zeros, as in yab.
+* `keyboard message$ view$` answers the key that is down while that view holds
+  the keyboard. yab checks `IsFocus()` and reads a string that `KeyDown` sets
+  and `KeyUp` clears, so a program sees a key once per press; that is exactly
+  what is implemented. The keyboard belongs to the view that was last clicked,
+  because the display view takes the focus and remembers which named view the
+  click landed in.
+* The key spelling is yab's own, copied from `YabView::KeyDown`: the modifiers
+  in its order (`ctrl-`, `command-`, `option-`, `shift-`), then the key's name
+  (`enter`, `left`, `f5`, ...), with a printable key standing for itself and
+  dropping the modifiers. Programs compare these strings, so the spellings had
+  to match rather than be nicer.
+* Both parse in yab's no-parenthesis form and in the parenthesised form its
+  examples use, because a parenthesised call is the view expression in
+  parentheses. One production each, `%prec tARGUMENT`, keeps the budget at the
+  same six conflicts.
+* The view registry `g_views` is now written under `g_window_mutex`, because
+  the window thread walks it on every pointer move while the interpreter thread
+  creates and closes views. The lock is still never held across a window lock.
+* Pointer moves outside a drag are only delivered to a view that asks for
+  them, so a press on the display arms `B_POINTER_EVENTS` for the rest of the
+  drag; before the first click on a view its mouse state stays at zeros.
+
+`tests/manual/m0104-mouse-keyboard` prints every changed mouse state and every
+key press and release, and a human confirms the coordinates, the button flag,
+the key names and the empty string on release.
+
+Checked here (Linux, no app_server): the grammar regenerates at the same six
+conflicts under `%expect 6`; `rk_yab.cpp` compiles against the Haiku headers;
+the C sources and the stub bridges build and link; the CLI suite is 35 passed,
+0 failed, 7 skipped as before; and a stub run parses and executes all five
+spellings -- `mouse message$(v$)`, `mouse message$ v$`, `keyboard message$(v$)`,
+`keyboard message$ "..."` and the literal-argument form -- returning the empty
+string the stub answers.
+
+What only the maintainer can check: that the pointer state updates while the
+pointer moves, that the keyboard follows the click, and that `m0104` finishes
+with Done. `m0104`'s window is 500x300 at 200, 200, tall enough for its view
+and the button row under it; the same arithmetic is what made `m0100`'s window
+come up one row short once already.
+
+Next slice: dropped files (`_Dropped`) are still unreported, and `view remove`
+-- which MouseWorld uses -- does not exist yet.

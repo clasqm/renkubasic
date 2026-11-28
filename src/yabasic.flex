@@ -395,6 +395,8 @@ VAL return tVAL;
 EOF return tMYEOF;
 "STR$" return tSTR;
 "INKEY$" return tINKEY;
+"MOUSE" return tMOUSE;
+"KEYBOARD" return tKEYBOARD;
 "MOUSEX" return tMOUSEX;
 "MOUSEY" return tMOUSEY;
 "MOUSEB" return tMOUSEB;

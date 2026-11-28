@@ -1,0 +1,54 @@
+// RenkuBASIC manual test: mouse message$ and keyboard message$
+// Derived from: yab 1.8.3 Examples/MouseWorld.yab and Examples/Typewriter.yab.
+//
+// Run with:  tests/run-tests.sh --suite manual --filter m0104
+//
+// A human must confirm:
+//   * clicking into the white area prints an "x:y:1:0:0" mouse line, and
+//     moving the pointer prints new ones as the coordinates change
+//   * typing a letter prints it once, and releasing the key prints an empty
+//     "key: []" line
+//   * the arrow keys print their names, and a shifted key prints "shift-..."
+//   * "Done" closes the window and the program exits with status 0
+
+// @requires: gui
+// @timeout: 300
+
+window open 200, 200 to 700, 500, "rk_events_win", "RenkuBASIC mouse and keyboard"
+layout "left, top", "rk_events_win"
+
+view 10, 10 to 460, 250, "rk_events_view", "rk_events_win"
+draw set "bgcolor", 245, 245, 245, "rk_events_view"
+draw set "highcolor", 0, 0, 0, "rk_events_view"
+draw text 10, 20, "click here, then move the pointer and type", "rk_events_view"
+draw flush "rk_events_view"
+
+button 10, 260 to 140, 285, "rk_events_done", "Done", "rk_events_win"
+
+print "click into the white area, move the pointer and type; Done finishes"
+print "key: []"
+
+running = true
+last$ = ""
+typed$ = ""
+while running
+  msg$ = message$
+  moved$ = mouse message$("rk_events_view")
+  if moved$ <> last$ then
+    last$ = moved$
+    print "mouse: " + moved$
+  endif
+  key$ = keyboard message$("rk_events_view")
+  if key$ <> typed$ then
+    typed$ = key$
+    print "key: [" + key$ + "]"
+  endif
+  if msg$ = "rk_events_done|" or msg$ = "rk_events_win:_QuitRequested|" then
+    running = false
+  endif
+  sleep 0.02
+wend
+
+window close "rk_events_win"
+print "m0104 done"
+exit 0

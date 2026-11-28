@@ -1086,6 +1086,19 @@ void function(struct command *cmd) /* performs a function */
     rk_yab_check();
     result = stSTRING;
     break;
+  /* The per-view event getters: the pointer over a view as
+     "x:y:left:middle:right", and the key that is down while that view holds
+     the keyboard. */
+  case fYABMOUSEMESSAGE:
+    pointer = my_strdup((char *)rk_yab_mouse_message(a1->pointer));
+    rk_yab_check();
+    result = stSTRING;
+    break;
+  case fYABKEYBOARDMESSAGE:
+    pointer = my_strdup((char *)rk_yab_keyboard_message(a1->pointer));
+    rk_yab_check();
+    result = stSTRING;
+    break;
   /* yab's file attributes. `attribute get$` reads one attribute as text, or
      lists every attribute of the file when the name is empty; `attribute
      get` reads one as a number. */

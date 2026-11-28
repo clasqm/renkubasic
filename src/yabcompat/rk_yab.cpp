@@ -110,6 +110,18 @@ struct YabView {
   rgb_color low;
   rgb_color high;
   int visible; /* 0 for a stack page that is not the selected one */
+  /* The pointer as yab's YabView keeps it: the last position seen inside this
+     view, in the view's own coordinates, and the buttons held at that moment.
+     `mouse message$` reads them back. */
+  int mouse_x;
+  int mouse_y;
+  int mouse_left;
+  int mouse_middle;
+  int mouse_right;
+  /* The key that is down while this view has the keyboard. yab sets it on a
+     key press and clears it on the release, so a program sees a key once per
+     press and then the empty string. */
+  std::string keys;
   YabView *next;
 };
 
@@ -125,6 +137,11 @@ struct YabWindow {
   std::string messages; /* widget events waiting for `message$`; written by
                            the window thread under the window lock, read and
                            cleared by the interpreter thread under it too */
+  std::string keyboard_view; /* the view that holds the keyboard: the one that
+                                was last clicked. yab gives the keyboard to
+                                whichever view has the focus; here the display
+                                view takes the focus and remembers which named
+                                view the click landed in. */
   YabWindow *next;
 };
 
@@ -175,6 +192,93 @@ YabView *find_view(const char *name) {
     }
   }
   return NULL;
+}
+
+/* The named view under a point of a window's content, newest first, so a view
+   created later covers one created earlier. yab's views are real child views
+   and the pointer reaches them directly; here they are offscreen bitmaps, so
+   the display view under the widgets asks this instead. The caller holds
+   `g_window_mutex`, which the interpreter thread also takes while it adds and
+   removes views. */
+YabView *view_at(YabWindow *window, BPoint where) {
+  for (YabView *view = g_views; view; view = view->next) {
+    if (view->window == window && view->visible &&
+        view->rect.Contains(where)) {
+      return view;
+    }
+  }
+  return NULL;
+}
+
+/* yab's name for a key: the modifiers in its order, then the key's name, with
+   an ordinary key standing for itself -- and a printable key drops the
+   modifiers, as `YabView::KeyDown` does. Programs compare these strings, so
+   the spellings are copied from it. */
+std::string key_text(BWindow *window, const char *bytes, int32 numBytes) {
+  std::string text;
+  BMessage *message = window ? window->CurrentMessage() : NULL;
+
+  if (!bytes || numBytes < 1) {
+    return text;
+  }
+  if (message) {
+    int32 key = 0;
+    int32 modifiers = 0;
+    message->FindInt32("key", &key);
+    message->FindInt32("modifiers", &modifiers);
+    if (modifiers & B_CONTROL_KEY) {
+      text += "ctrl-";
+    }
+    if (modifiers & B_COMMAND_KEY) {
+      text += "command-";
+    }
+    if (modifiers & B_OPTION_KEY) {
+      text += "option-";
+    }
+    if (modifiers & B_SHIFT_KEY) {
+      text += "shift-";
+    }
+    switch (bytes[0]) {
+    case B_BACKSPACE: return text + "backspace";
+    case B_ENTER: return text + "enter";
+    case B_TAB: return text + "tab";
+    case B_ESCAPE: return text + "esc";
+    case B_LEFT_ARROW: return text + "left";
+    case B_RIGHT_ARROW: return text + "right";
+    case B_UP_ARROW: return text + "up";
+    case B_DOWN_ARROW: return text + "down";
+    case B_INSERT: return text + "insert";
+    case B_DELETE: return text + "del";
+    case B_HOME: return text + "home";
+    case B_END: return text + "end";
+    case B_PAGE_UP: return text + "pageup";
+    case B_PAGE_DOWN: return text + "pagedown";
+    case B_FUNCTION_KEY:
+      switch (key) {
+      case B_F1_KEY: return text + "f1";
+      case B_F2_KEY: return text + "f2";
+      case B_F3_KEY: return text + "f3";
+      case B_F4_KEY: return text + "f4";
+      case B_F5_KEY: return text + "f5";
+      case B_F6_KEY: return text + "f6";
+      case B_F7_KEY: return text + "f7";
+      case B_F8_KEY: return text + "f8";
+      case B_F9_KEY: return text + "f9";
+      case B_F10_KEY: return text + "f10";
+      case B_F11_KEY: return text + "f11";
+      case B_F12_KEY: return text + "f12";
+      case B_PRINT_KEY: return text + "print";
+      case B_SCROLL_KEY: return text + "scroll";
+      case B_PAUSE_KEY: return text + "pause";
+      default: break;
+      }
+      break;
+    default:
+      break;
+    }
+  }
+  text.assign(bytes, 1);
+  return text;
 }
 
 void trim(char *text) {
@@ -348,8 +452,17 @@ YabView *create_view(YabWindow *window, double x1, double y1, double x2,
   entry->high.blue = 0;
   entry->high.alpha = 255;
   entry->visible = 1;
-  entry->next = g_views;
-  g_views = entry;
+  entry->mouse_x = 0;
+  entry->mouse_y = 0;
+  entry->mouse_left = 0;
+  entry->mouse_middle = 0;
+  entry->mouse_right = 0;
+  {
+    /* The window thread reads the registry on every pointer move. */
+    std::lock_guard<std::mutex> guard(g_window_mutex);
+    entry->next = g_views;
+    g_views = entry;
+  }
   return entry;
 }
 
@@ -843,7 +956,11 @@ class YabDisplayView : public BView {
 public:
   YabDisplayView(BRect frame, YabWindow *owner)
       : BView(frame, "rk-yab-display", B_FOLLOW_ALL, B_WILL_DRAW),
-        fOwner(owner) {}
+        fOwner(owner) {
+    /* The keyboard goes to the focused view, and yab's views are focusable;
+       this one stands in for all of them. */
+    SetFlags(Flags() | B_NAVIGABLE);
+  }
 
   void Draw(BRect update) {
     SetHighColor(255, 255, 255, 255);
@@ -861,7 +978,84 @@ public:
      yabasic graphic window. */
   bool QuitRequested() { return false; }
 
+  /* yab's YabView records the pointer on every mouse message it gets and takes
+     the keyboard when it is clicked. This view covers the whole window and is
+     the only one the pointer reaches, so it records the state on the view
+     whose rectangle contains the point instead. */
+  void MouseDown(BPoint where) {
+    /* Pointer moves are only delivered while a view asked for them, and the
+       request lasts until the button is released. yab's views get them from
+       the plain BView tracking; this one has to ask, so moving the pointer
+       over a view keeps updating `mouse message$`. */
+    SetMouseEventMask(B_POINTER_EVENTS, B_NO_POINTER_HISTORY);
+    MakeFocus(true);
+    note_pointer(true);
+    BView::MouseDown(where);
+  }
+
+  void MouseUp(BPoint where) {
+    note_pointer(false);
+    BView::MouseUp(where);
+  }
+
+  void MouseMoved(BPoint where, uint32 transit, const BMessage *message) {
+    note_pointer(false);
+    BView::MouseMoved(where, transit, message);
+  }
+
+  void KeyDown(const char *bytes, int32 numBytes) {
+    record_key(key_text(Window(), bytes, numBytes));
+    BView::KeyDown(bytes, numBytes);
+  }
+
+  void KeyUp(const char *bytes, int32 numBytes) {
+    record_key(std::string());
+    BView::KeyUp(bytes, numBytes);
+  }
+
 private:
+  /* Store the pointer on the view under it, in that view's coordinates, with
+     yab's three button flags. A press also gives that view the keyboard, which
+     is what clicking a focusable view does in yab. */
+  void note_pointer(bool click) {
+    BPoint point;
+    uint32 buttons = 0;
+
+    if (!fOwner) {
+      return;
+    }
+    GetMouse(&point, &buttons, false);
+    std::lock_guard<std::mutex> guard(g_window_mutex);
+    YabView *view = view_at(fOwner, point);
+    if (!view) {
+      return;
+    }
+    view->mouse_x = (int)(point.x - view->rect.left);
+    view->mouse_y = (int)(point.y - view->rect.top);
+    view->mouse_left = (buttons & B_PRIMARY_MOUSE_BUTTON) ? 1 : 0;
+    view->mouse_middle = (buttons & B_TERTIARY_MOUSE_BUTTON) ? 1 : 0;
+    view->mouse_right = (buttons & B_SECONDARY_MOUSE_BUTTON) ? 1 : 0;
+    if (click && view->name) {
+      fOwner->keyboard_view = view->name;
+    }
+  }
+
+  /* Keep the key only on the view that has the keyboard, and clear it on the
+     release, so a program reads a key once per press. */
+  void record_key(const std::string &text) {
+    if (!fOwner) {
+      return;
+    }
+    std::lock_guard<std::mutex> guard(g_window_mutex);
+    for (YabView *view = g_views; view; view = view->next) {
+      if (view->window == fOwner && view->name &&
+          fOwner->keyboard_view == view->name) {
+        view->keys = text;
+        return;
+      }
+    }
+  }
+
   YabWindow *fOwner;
 };
 
@@ -1121,10 +1315,15 @@ int destroy_window(YabWindow *window) {
   while (view) {
     YabView *next = view->next;
     if (view->window == window) {
-      if (previous) {
-        previous->next = next;
-      } else {
-        g_views = next;
+      {
+        /* The window thread may still be walking the registry for a pointer
+           move; the window is quit, but take the same lock as it does. */
+        std::lock_guard<std::mutex> guard(g_window_mutex);
+        if (previous) {
+          previous->next = next;
+        } else {
+          g_views = next;
+        }
       }
       destroy_view(view);
     } else {
@@ -6425,6 +6624,58 @@ const char *rk_yab_message(void) {
     entry->window->Unlock();
   }
   return collected.c_str();
+}
+
+/* yab's per-view getters. Both answer for a named view and report anything else
+   as a runtime error, like the rest of the bridge. The values are written by
+   the window thread under the window lock, so they are read under it too. */
+
+const char *rk_yab_mouse_message(const char *view_name) {
+  static std::string result;
+
+  clear_error();
+  result.clear();
+  YabView *view = find_view(view_name);
+  if (!view || !view->window || !view->window->window) {
+    snprintf(g_error, sizeof(g_error), "mouse message$: '%s' is not a view",
+             view_name ? view_name : "");
+    return result.c_str();
+  }
+  if (view->window->window->LockWithTimeout(100000) != B_OK) {
+    set_error("mouse message$: the window did not respond");
+    return result.c_str();
+  }
+  char buffer[64];
+  snprintf(buffer, sizeof(buffer), "%d:%d:%d:%d:%d", view->mouse_x,
+           view->mouse_y, view->mouse_left, view->mouse_middle,
+           view->mouse_right);
+  view->window->window->Unlock();
+  result = buffer;
+  return result.c_str();
+}
+
+const char *rk_yab_keyboard_message(const char *view_name) {
+  static std::string result;
+
+  clear_error();
+  result.clear();
+  YabView *view = find_view(view_name);
+  if (!view || !view->window || !view->window->window) {
+    snprintf(g_error, sizeof(g_error), "keyboard message$: '%s' is not a view",
+             view_name ? view_name : "");
+    return result.c_str();
+  }
+  if (view->window->window->LockWithTimeout(100000) != B_OK) {
+    set_error("keyboard message$: the window did not respond");
+    return result.c_str();
+  }
+  /* yab answers only for the view that holds the keyboard; every other view
+     reports the empty string. */
+  if (view->name && view->window->keyboard_view == view->name) {
+    result = view->keys;
+  }
+  view->window->window->Unlock();
+  return result.c_str();
 }
 
 } // extern "C"

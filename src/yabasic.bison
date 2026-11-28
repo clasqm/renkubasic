@@ -188,6 +188,7 @@ void collect_missing_clauses(char *string, char exclude) {
 %token tSQRT tSQR tMYEOF tABS tSIG
 %token tINT tCEIL tFLOOR tFRAC tROUND tMOD tRAN tVAL tLEFT tRIGHT tMID tLEN tMIN tMAX
 %token tSTR tINKEY tCHR tASC tHEX tDEC tBIN tUPPER tLOWER tMOUSEX tMOUSEY tMOUSEB tMOUSEMOD
+%token tMOUSE tKEYBOARD
 %token tTRIM tLTRIM tRTRIM tSTRING2 tREPLACE tINSTR tRINSTR tCHOMP
 %token tSYSTEM tSYSTEM2 tPEEK tPEEK2 tPOKE tFRNFN_CALL tFRNFN_CALL2 tFRNFN_SIZE
 %token tFRNBF_ALLOC tFRNBF_FREE tFRNBF_SIZE tFRNBF_DUMP tFRNBF_SET tFRNBF_GET tFRNBF_GET2
@@ -608,6 +609,12 @@ string_function: tLEFT '(' string_expression ',' expression ')' {create_function
      parentheses, and the parenthesised form is left out so the grammar keeps
      its six conflicts. */
   | tMESSAGE {create_function(fYABMESSAGE);}
+  /* yab's per-view event getters. Its grammar has them as `mouse message$
+     <view>` and `keyboard message$ <view>`; a parenthesised call is just the
+     view expression in parentheses, which is how yab's own examples write it,
+     so there is no second rule to conflict with this one. */
+  | tMOUSE tMESSAGE string_expression %prec tARGUMENT {create_function(fYABMOUSEMESSAGE);}
+  | tKEYBOARD tMESSAGE string_expression %prec tARGUMENT {create_function(fYABKEYBOARDMESSAGE);}
   | tATTRIBUTE tGETS '(' string_expression ',' string_expression ')' {create_function(fYABATTRIBUTEGET);}
   | tPEEK2 '(' string_expression ',' string_expression ')' {create_function(fPEEK3);}
   | tTOKENALT '(' string_scalar_or_array ',' string_expression ')' {add_command(cTOKENALT2);}
