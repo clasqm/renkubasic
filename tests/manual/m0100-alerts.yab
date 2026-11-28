@@ -13,7 +13,7 @@
 // @requires: gui
 // @timeout: 300
 
-window open 200, 200 to 420, 380, "rk_alert_win", "RenkuBASIC alerts"
+window open 200, 200 to 420, 440, "rk_alert_win", "RenkuBASIC alerts"
 layout "left, top", "rk_alert_win"
 
 button 10, 10 to 180, 34, "rk_alert_none", "Empty alert", "rk_alert_win"

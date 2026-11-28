@@ -30,7 +30,9 @@ while running
   msg$ = message$
   switch msg$
     case "rk_panel_load|"
-      chosen$ = filepanel "Load-File", "Choose a file", "/boot/home", ""
+      // Only yab's three-argument form has a grammar rule (see the gaps list),
+      // so the panel starts in the directory given and with no name.
+      chosen$ = filepanel "Load-File", "Choose a file", "/boot/home"
       if chosen$ <> "" then
         draw flush "rk_panel_view"
         draw text 10, 40, "loaded: " + chosen$, "rk_panel_view"

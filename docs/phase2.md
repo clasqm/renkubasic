@@ -1079,5 +1079,27 @@ plus `g0123-audio`, or 19 passed and one skipped if the audio probe fails), the
 CLI suite unchanged at 40 / 0 / 2, and `m0103-audio` played by hand with the
 seven steps heard.
 
+Accepted on Haiku (2026-11-28, current `main`): CLI **40 / 0 / 2** and GUI
+**20 / 0 / 0** with `g0123-audio` passing and the `audio` probe available, so
+rounds 15 and 16 both hold. In the manual suite `m0102-widget-messages` and
+`m0103-audio` now pass; `m0103` reached step 6 and the media kit decoded and
+played the MP3 (`mediasound play` returned 1), with `BMediaTrack::ReadFrames`
+printing "Last buffer" (0x80004007) on stderr at the end of the track -- that is
+the decoder reporting the end of the file, not a failure. The master gain read
+back as -1. Whether the seven steps were actually audible is the listening
+check and cannot be recorded here.
+
+The other two manual tests failed inside the tests, not the interpreter:
+
+* `m0100-alerts` stopped at its sixth button with "the widget does not fit into
+  its window": the window was 180 pixels tall and the buttons end at y = 209,
+  so it is now 240 pixels tall (200, 200 to 420, 440), the same fix `m0102`
+  needed.
+* `m0101-filepanel-popupmenu` stopped at its load panel, which still passed a
+  fourth argument (""); only yab's three-argument `filepanel` has a rule here,
+  so that call now uses the three-argument form as the save branch already did.
+  Pressing each of its three buttons, and each of `m0100`'s six, is still a
+  human check.
+
 Next slice: `mouse message$` and `keyboard message$`, which now have a queue to
 feed.
