@@ -999,6 +999,13 @@ headers, which is where `BAlert`, `BFilePanel`, `BPopUpMenu::Go` and the
 has been pressed, no popup opened and no panel shown here, so a real click is
 the next run's business.
 
+The first Haiku build of this round stopped at the link instead: five undefined
+`BFilePanel` symbols (`BFilePanel`, `Show`, `Hide`, `SetPanelDirectory`,
+`SetSaveText`). `BFilePanel` is Tracker's, and it lives in `libtracker`, not in
+`libbe`, so the build has to link the tracker kit as well. CMake now finds
+`libtracker` beside the other kits, fails with a clear message when it is
+missing, and the link line matches yab's own `-lbe ... -ltracker ...`.
+
 What the next Haiku run has to show: GUI 19 / 0 / 0, and the three manual tests
 (`m0100`, `m0101`, `m0102`) running to the end by hand.
 

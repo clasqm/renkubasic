@@ -74,19 +74,23 @@ target_compile_options(renkubasic PRIVATE -Wall
 # BBitmap, BFont) and the translation kit to encode screenshots as PNG.
 find_library(HAIKU_BE_LIBRARY NAMES be)
 find_library(HAIKU_TRANSLATION_LIBRARY NAMES translation)
+# `filepanel` is Tracker's file panel: BFilePanel lives in libtracker, not in
+# libbe, so the tracker kit has to be linked too.
+find_library(HAIKU_TRACKER_LIBRARY NAMES tracker)
 # The audio commands use the game kit (`sound`) and the media kit
 # (`mediasound`, `loudness`).
 find_library(HAIKU_GAME_LIBRARY NAMES game)
 find_library(HAIKU_MEDIA_LIBRARY NAMES media)
 if(NOT HAIKU_BE_LIBRARY OR NOT HAIKU_TRANSLATION_LIBRARY
+   OR NOT HAIKU_TRACKER_LIBRARY
    OR NOT HAIKU_GAME_LIBRARY OR NOT HAIKU_MEDIA_LIBRARY)
   message(FATAL_ERROR
-    "RenkuBASIC needs the Haiku kits: libbe, libtranslation, libgame and libmedia")
+    "RenkuBASIC needs the Haiku kits: libbe, libtranslation, libtracker, libgame and libmedia")
 endif()
 
 target_link_libraries(renkubasic PRIVATE ${CURSES_LIBRARIES} m
-  ${HAIKU_BE_LIBRARY} ${HAIKU_TRANSLATION_LIBRARY} ${HAIKU_GAME_LIBRARY}
-  ${HAIKU_MEDIA_LIBRARY})
+  ${HAIKU_BE_LIBRARY} ${HAIKU_TRANSLATION_LIBRARY} ${HAIKU_TRACKER_LIBRARY}
+  ${HAIKU_GAME_LIBRARY} ${HAIKU_MEDIA_LIBRARY})
 
 # yabasic's man page and HTML manual are replaced by docs/manual in phase 3;
 # until then the original page is installed unchanged so `man renkubasic`
