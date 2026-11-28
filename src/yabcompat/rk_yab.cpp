@@ -5624,6 +5624,30 @@ static void panel_trace(const char *text) {
   fprintf(stderr, "rk_yab: %s\n", text);
 }
 
+/* Show() returns whether or not the panel actually reached the screen, and a
+   panel that was never shown then waits for a click that cannot come. The
+   window's own hidden flag and frame are what the log needs to tell the two
+   apart. Locking it proves its thread is still running too. */
+static void panel_trace_window(const char *text, BWindow *window) {
+  if (window == NULL) {
+    fprintf(stderr, "rk_yab: filepanel: %s: the panel has no window\n", text);
+    return;
+  }
+  if (!window->Lock()) {
+    fprintf(stderr, "rk_yab: filepanel: %s: the panel window cannot be locked, "
+                    "so its thread is gone\n", text);
+    return;
+  }
+  bool hidden = window->IsHidden();
+  BRect frame = window->Frame();
+  window->Unlock();
+  fprintf(stderr,
+          "rk_yab: filepanel: %s: the panel window is %s, frame %.0f,%.0f to "
+          "%.0f,%.0f\n",
+          text, hidden ? "still hidden" : "not hidden", frame.left, frame.top,
+          frame.right, frame.bottom);
+}
+
 /* BFilePanel reports its result as a message, but yab's `filepanel` is a
    function the program waits on. The panel's target is a looper of our own: it
    records the chosen path and releases the wait the caller sits in. */
@@ -5740,8 +5764,10 @@ const char *rk_yab_filepanel(const char *mode, const char *title,
   }
   panel->Show();
   panel_trace("filepanel: the panel is open");
+  panel_trace_window("after Show()", panel->Window());
   acquire_sem(looper->waiting);
   panel_trace("filepanel: the panel answered");
+  panel_trace_window("when it answered", panel->Window());
   panel->Hide();
   delete panel;
   if (looper->chosen.Length() > 0) {

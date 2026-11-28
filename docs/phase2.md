@@ -1149,5 +1149,15 @@ panel reported a file, a saved name or a cancel, the panel answered -- so a
 manual run says where it stopped without the runner's timeout being the only
 evidence.
 
+That trace still could not tell a panel that was never shown from one that was
+shown and simply never clicked, since both end as the same blocking wait. It
+now traces the panel window as well, once right after `Show()` and again at
+the moment the panel answers: whether the window is hidden or not, its frame,
+and whether it can be locked at all, which proves its thread is still running.
+A window that is still hidden, or one that cannot be locked, never reached the
+screen; "not hidden" with a sensible frame followed by no answer means the
+panel was there and nothing was pressed on it. The wait itself is unchanged
+and still blocks the program.
+
 Next slice: `mouse message$` and `keyboard message$`, which now have a queue to
 feed.
