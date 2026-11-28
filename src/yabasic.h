@@ -382,7 +382,8 @@ enum cmd_type {
 
     /* yab GUI commands; implemented in src/yabcompat and dispatched together
        through rk_yab_command(). Arguments are popped in reverse order. */
-    cYABOPENWIN, cYABCLOSEWIN, cYABWINSET, cYABVIEW,
+    cYABOPENWIN, cYABCLOSEWIN, cYABWINSET, cYABVIEW, cYABVIEWREMOVE,
+    cYABVIEWDROPZONE,
     cYABDRAWSETTEXT, cYABDRAWSETCOLOUR, cYABDRAWTEXT, cYABDRAWDOT,
     cYABDRAWLINE, cYABDRAWRECT, cYABDRAWROUNDRECT, cYABDRAWCIRCLE,
     cYABDRAWELLIPSE, cYABDRAWARC, cYABDRAWCURVE, cYABDRAWTRIANGLE,

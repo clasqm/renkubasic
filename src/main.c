@@ -1288,6 +1288,8 @@ static void initialize(void)
   cexplanation[cYABCLOSEWIN] = "YABCLOSEWIN";
   cexplanation[cYABWINSET] = "YABWINSET";
   cexplanation[cYABVIEW] = "YABVIEW";
+  cexplanation[cYABVIEWREMOVE] = "YABVIEWREMOVE";
+  cexplanation[cYABVIEWDROPZONE] = "YABVIEWDROPZONE";
   cexplanation[cYABDRAWSETTEXT] = "YABDRAWSETTEXT";
   cexplanation[cYABDRAWSETCOLOUR] = "YABDRAWSETCOLOUR";
   cexplanation[cYABDRAWTEXT] = "YABDRAWTEXT";
@@ -2030,6 +2032,8 @@ static void run_it()
       case cYABCLOSEWIN:
       case cYABWINSET:
       case cYABVIEW:
+      case cYABVIEWREMOVE:
+      case cYABVIEWDROPZONE:
       case cYABDRAWSETTEXT:
       case cYABDRAWSETCOLOUR:
       case cYABDRAWTEXT:

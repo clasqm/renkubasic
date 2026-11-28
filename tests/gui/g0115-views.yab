@@ -35,6 +35,13 @@ draw set "bgcolor", 200, 230, 200, "rk_stack21"
 draw set "bgcolor", 230, 200, 230, "rk_stack22"
 stackview set "rk_stack2", 2
 
+// A removed view's name is free again, as in yab.
+view 300, 230 to 440, 300, "rk_removable", "rk_views_win"
+view dropzone "rk_removable"
+view remove "rk_removable"
+view 300, 230 to 440, 300, "rk_removable", "rk_views_win"
+view remove "rk_removable"
+
 sleep 0.1
 window close "rk_views_win"
 print "g0115 done"

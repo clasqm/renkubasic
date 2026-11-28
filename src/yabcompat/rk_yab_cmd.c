@@ -115,6 +115,18 @@ void rk_yab_command(struct command *cmd) {
     expect(rk_yab_view_open(x1, y1, x2, y2, id, window));
     break;
   }
+  case cYABVIEWREMOVE: {
+    char *id = take_string();
+
+    expect(rk_yab_view_remove(id));
+    break;
+  }
+  case cYABVIEWDROPZONE: {
+    char *id = take_string();
+
+    expect(rk_yab_view_dropzone(id));
+    break;
+  }
   case cYABDRAWSETTEXT: {
     char *view = take_string();
     char *value = take_string();

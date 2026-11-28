@@ -168,7 +168,7 @@ void collect_missing_clauses(char *string, char exclude) {
 %token tTABVIEW tBOXVIEW tSPLITVIEW tSTACKVIEW tCANVAS tREGION tADD tREMOVE
 /* The list family. `get$` is the string form of yab's get (tGET here) and
    `get` is its numeric form (tGETNUM in yab, tGET here). */
-%token tLISTBOX tDROPBOX tTREEBOX tCOLUMNBOX tCALENDAR tCOLORCONTROL
+%token tLISTBOX tDROPBOX tDROPZONE tTREEBOX tCOLUMNBOX tCALENDAR tCOLORCONTROL
 %token tCOLUMN tSORT tEXPAND tCOLLAPSE tSELECT tGETS
 /* Menus and the clipboard: `menu`, `submenu` and `subsubmenu` take the command
    words `set`, `copy` and `paste$` from yab. */
@@ -351,6 +351,8 @@ statement:  /* empty */
   | tWINDOW tCLOSE string_expression {add_command(cYABCLOSEWIN);}
   | tWINDOW tSET string_expression ',' string_expression ',' string_expression {add_command(cYABWINSET);}
   | tVIEW coordinates to coordinates ',' string_expression ',' string_expression {add_command(cYABVIEW);}
+  | tVIEW tREMOVE string_expression {add_command(cYABVIEWREMOVE);}
+  | tVIEW tDROPZONE string_expression {add_command(cYABVIEWDROPZONE);}
   | tDRAW tSET string_expression ',' string_expression {add_command(cYABDRAWSETTEXT);}
   | tDRAW tSET string_expression ',' expression ',' expression ',' expression ',' string_expression {add_command(cYABDRAWSETCOLOUR);}
   | tDRAW tTEXT coordinates ',' string_expression ',' string_expression {add_command(cYABDRAWTEXT);}

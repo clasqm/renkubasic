@@ -372,6 +372,15 @@ const char *rk_yab_mouse_message(const char *view);
    itself -- and "" once it is released or when the view has no keyboard. */
 const char *rk_yab_keyboard_message(const char *view);
 
+/* `view remove "id"`: yab deletes the view together with the widgets inside
+   it, and the pixels it painted go with it. Returns 1 on success, 0 with the
+   reason in rk_yab_last_error(). */
+int rk_yab_view_remove(const char *id);
+
+/* `view dropzone "id"`: the view accepts files dragged onto it, which arrive
+   in `message$` as "id:_Dropped:path|", one per file, as in yab. */
+int rk_yab_view_dropzone(const char *id);
+
 /* ---- audio ------------------------------------------------------------- */
 
 /* `sound play path$, loop` starts a file through the game kit; `loop` other

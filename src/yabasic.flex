@@ -293,6 +293,8 @@ COLORCONTROL {BEGIN(YABKEY);return tCOLORCONTROL;}
 <YABKEY>GET/[ \t\n] {BEGIN(INITIAL);return tGET;}
 <YABKEY>ADD/[ \t] {BEGIN(INITIAL);return tADD;}
 <YABKEY>REMOVE/[ \t] {BEGIN(INITIAL);return tREMOVE;}
+  /* `view dropzone "id"`: the view accepts files dragged onto it. */
+<YABKEY>DROPZONE/[ \t] {BEGIN(INITIAL);return tDROPZONE;}
 <YABKEY>SELECT/[ \t] {BEGIN(INITIAL);return tSELECT;}
 <YABKEY>SORT/[ \t] {BEGIN(INITIAL);return tSORT;}
 <YABKEY>EXPAND/[ \t] {BEGIN(INITIAL);return tEXPAND;}

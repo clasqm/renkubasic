@@ -240,8 +240,10 @@ like `rk_gui_save_png()`.
   limits follow from that: the keyboard belongs to the view that was last
   clicked, not to a child control that took the focus itself, and a view is
   found by its rectangle, so the topmost of two overlapping views wins.
-  Dropped files (`_Dropped`) are not reported, because an offscreen bitmap
-  never receives a drop.
+  Dropped files (`_Dropped`) reach `message$` only for a view that `view
+  dropzone` named: the drop arrives at the window's display view, which looks up
+  the view under the drop point, because an offscreen bitmap is never a drop
+  target itself.
 * **The audio commands play one sound at a time.** `sound` uses the game kit,
   which plays WAV files (and loops them); `mediasound` plays whatever the media
   kit can decode, so its formats are the machine's decoders. There is no mixing
@@ -896,7 +898,6 @@ The third run was green: CLI 40 / 0 / 2, GUI unchanged at 17 / 0 / 0, with
   expression in parentheses -- which is how yab's own examples write it, and
   why one rule each keeps the grammar's six conflicts. They read the state the
   display view records on the view under the pointer (see the gaps list).
-  Dropped files are still not reported.
 
 Checked here (Linux, no app_server): the grammar regenerates with the same six
 conflicts; all C sources plus the stub bridges build and link; `print
@@ -1247,5 +1248,45 @@ with Done. `m0104`'s window is 500x300 at 200, 200, tall enough for its view
 and the button row under it; the same arithmetic is what made `m0100`'s window
 come up one row short once already.
 
-Next slice: dropped files (`_Dropped`) are still unreported, and `view remove`
--- which MouseWorld uses -- does not exist yet.
+The next Haiku run passed `m0104` and the rest of the suite unchanged: CLI 40
+passed, 0 failed, 2 skipped; GUI 20 passed. Its stdout shows the pointer state
+changing as the pointer moved over the view (`mouse: 69:202:0:0:0` through
+`mouse: 55:239:0:0:0`), so the display view's pointer tracking and the per-view
+`mouse message$` getter both work. The run's report keeps the last ten lines
+only, so it cannot say whether the button flags or any `key:` line appeared
+earlier; those stay human checks.
+
+The next slice is the two yab statements that are still absent, `view remove`
+and `view dropzone` -- MouseWorld uses the first, DropWorld the second.
+
+* `view remove "id"` deletes the view and the widgets inside it, and the pixels
+  it painted go with it. yab's widgets are children of the view; here they are
+  children of the window's display view, placed inside the view's rectangle, so
+  the rectangle decides which ones are removed. The view leaves the registry
+  under the same `g_window_mutex` the window thread walks it with, then the
+  window is composited again without it.
+* `view dropzone "id"` marks the view as accepting dragged files. The drop
+  itself arrives at the display view, which finds the named view under the drop
+  point and appends yab's `"id:_Dropped:path|"`, one per file, to the window's
+  `message$` queue; a drop on a view that is not a drop zone is ignored, as in
+  yab. A drop point is in the display view's coordinates, which are the
+  window's.
+* Both are command rules of one string each, after `view`, and keep the grammar
+  at the same six conflicts.
+* `tests/manual/m0105-dropzone-view-remove` prints every `message$` it sees, so
+  a human drags a file onto the yellow view, presses "Remove view" and checks
+  that the area turns white and that a further drag prints nothing.
+* `g0115-views` now also removes a view and creates it again under the same
+  name, which is the part of `view remove` a script can check on its own.
+
+Checked here (Linux, no app_server): the grammar regenerates at the same six
+conflicts under `%expect 6`; `rk_yab.cpp` compiles against the Haiku headers;
+the C sources and the stub bridges build and link; the CLI suite is 35 passed,
+0 failed, 7 skipped; the GUI suite's `g0115-views` is skipped without a GUI.
+
+What only the maintainer can check: that a drag from Tracker reaches the view
+and prints the file's path, that the removed view's pixels disappear, and that
+`m0105` finishes with Done.
+
+Next slice: yab's `window clear "id"`, which deletes a whole view tree and is
+still unparsed here, and `view scale`.

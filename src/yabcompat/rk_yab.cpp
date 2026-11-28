@@ -110,6 +110,7 @@ struct YabView {
   rgb_color low;
   rgb_color high;
   int visible; /* 0 for a stack page that is not the selected one */
+  int dropzone; /* 1 when `view dropzone` made it accept dragged files */
   /* The pointer as yab's YabView keeps it: the last position seen inside this
      view, in the view's own coordinates, and the buttons held at that moment.
      `mouse message$` reads them back. */
@@ -452,6 +453,7 @@ YabView *create_view(YabWindow *window, double x1, double y1, double x2,
   entry->high.blue = 0;
   entry->high.alpha = 255;
   entry->visible = 1;
+  entry->dropzone = 0;
   entry->mouse_x = 0;
   entry->mouse_y = 0;
   entry->mouse_left = 0;
@@ -1013,6 +1015,16 @@ public:
     BView::KeyUp(bytes, numBytes);
   }
 
+  /* A file dropped on a view that `view dropzone` named becomes yab's
+     "view:_Dropped:path|" text, one per file, on the window's event queue. */
+  void MessageReceived(BMessage *message) {
+    if (message->what == B_SIMPLE_DATA) {
+      record_drop(message);
+      return;
+    }
+    BView::MessageReceived(message);
+  }
+
 private:
   /* Store the pointer on the view under it, in that view's coordinates, with
      yab's three button flags. A press also gives that view the keyboard, which
@@ -1038,6 +1050,40 @@ private:
     if (click && view->name) {
       fOwner->keyboard_view = view->name;
     }
+  }
+
+  /* yab's YabView does this in its own MessageReceived; here every drop lands
+     on the display view, so the view under the drop point decides whether it
+     is wanted. The window thread already holds the window lock, which is the
+     one `message$` reads `messages` under. */
+  void record_drop(BMessage *message) {
+    BPoint point;
+    entry_ref ref;
+    int32 index = 0;
+    std::string text;
+
+    if (!fOwner) {
+      return;
+    }
+    /* The drop point is in this view's coordinates, which are the window's. */
+    point = message->DropPoint();
+    std::lock_guard<std::mutex> guard(g_window_mutex);
+    YabView *view = view_at(fOwner, point);
+    if (!view || !view->dropzone || !view->name) {
+      return;
+    }
+    while (message->FindRef("refs", index, &ref) == B_OK) {
+      BEntry dropped(&ref);
+      BPath path;
+      if (dropped.GetPath(&path) == B_OK) {
+        text += view->name;
+        text += ":_Dropped:";
+        text += path.Path();
+        text += "|";
+      }
+      index++;
+    }
+    fOwner->messages += text;
   }
 
   /* Keep the key only on the view that has the keyboard, and clear it on the
@@ -2226,6 +2272,84 @@ int rk_yab_view_open(double x1, double y1, double x2, double y2,
     return 0;
   }
   return refresh_window(window) ? 1 : 0;
+}
+
+/* yab's widgets are children of their view, so removing the view removes
+   them; here they are children of the window's display view, placed inside the
+   view's rectangle, so that rectangle decides which ones go. */
+int rk_yab_view_remove(const char *view_name) {
+  clear_error();
+  YabView *view = find_view(view_name);
+  if (!view) {
+    snprintf(g_error, sizeof(g_error), "view remove: '%s' is not a view",
+             view_name ? view_name : "");
+    return 0;
+  }
+  YabWindow *window = view->window;
+  if (!window || !window->window) {
+    set_error("view remove: the window is not open");
+    return 0;
+  }
+  if (window->window->LockWithTimeout(100000) != B_OK) {
+    set_error("view remove: the window did not respond");
+    return 0;
+  }
+  YabWidget *widget = g_widgets;
+  YabWidget *previous_widget = NULL;
+  while (widget) {
+    YabWidget *next = widget->next;
+    BView *attached = widget->outer ? widget->outer : widget->view;
+    if (widget->window == window && attached &&
+        view->rect.Contains(attached->Frame().LeftTop())) {
+      attached->RemoveSelf();
+      delete attached;
+      if (previous_widget) {
+        previous_widget->next = next;
+      } else {
+        g_widgets = next;
+      }
+      free(widget->name);
+      delete widget;
+    } else {
+      previous_widget = widget;
+    }
+    widget = next;
+  }
+  window->window->Unlock();
+
+  /* The window thread walks the registry on every pointer move, so the entry
+     leaves it under the same lock. */
+  {
+    std::lock_guard<std::mutex> guard(g_window_mutex);
+    YabView *previous = NULL;
+    YabView *entry = g_views;
+    while (entry) {
+      if (entry == view) {
+        if (previous) {
+          previous->next = entry->next;
+        } else {
+          g_views = entry->next;
+        }
+        break;
+      }
+      previous = entry;
+      entry = entry->next;
+    }
+  }
+  destroy_view(view);
+  return refresh_window(window) ? 1 : 0;
+}
+
+int rk_yab_view_dropzone(const char *view_name) {
+  clear_error();
+  YabView *view = find_view(view_name);
+  if (!view) {
+    snprintf(g_error, sizeof(g_error), "view dropzone: '%s' is not a view",
+             view_name ? view_name : "");
+    return 0;
+  }
+  view->dropzone = 1;
+  return 1;
 }
 
 int rk_yab_view_set_font(const char *spec, const char *view_name) {

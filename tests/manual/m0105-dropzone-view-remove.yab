@@ -1,0 +1,50 @@
+// RenkuBASIC manual test: view dropzone and view remove
+// Derived from: yab 1.8.3 Examples/DropWorld.yab and Examples/MouseWorld.yab.
+//
+// Run with:  tests/run-tests.sh --suite manual --filter m0105
+//
+// A human must confirm:
+//   * dragging a file from Tracker onto the yellow area prints
+//     "message: [rk_drop_view:_Dropped:/...]" with the file's own path
+//   * a second file dragged onto it prints a second such message
+//   * "Remove view" takes the yellow area away (it turns white) and a drag
+//     onto that place then prints nothing
+//   * "Done" closes the window and the program exits with status 0
+
+// @requires: gui
+// @timeout: 300
+
+window open 150, 150 to 650, 450, "rk_drop_win", "RenkuBASIC drop zone"
+layout "left, top", "rk_drop_win"
+
+view 10, 10 to 220, 200, "rk_drop_view", "rk_drop_win"
+draw set "bgcolor", 240, 240, 200, "rk_drop_view"
+draw set "highcolor", 0, 0, 0, "rk_drop_view"
+draw text 10, 20, "drag a file here", "rk_drop_view"
+draw flush "rk_drop_view"
+view dropzone "rk_drop_view"
+
+button 260, 10 to 400, 35, "rk_drop_remove", "Remove view", "rk_drop_win"
+button 260, 45 to 400, 70, "rk_drop_done", "Done", "rk_drop_win"
+
+print "drag a file onto the yellow area, then Remove view, then Done"
+
+running = true
+while running
+  msg$ = message$
+  if msg$ <> "" then
+    print "message: [" + msg$ + "]"
+  endif
+  if msg$ = "rk_drop_remove|" then
+    view remove "rk_drop_view"
+    print "view removed"
+  endif
+  if msg$ = "rk_drop_done|" or msg$ = "rk_drop_win:_QuitRequested|" then
+    running = false
+  endif
+  sleep 0.05
+wend
+
+window close "rk_drop_win"
+print "m0105 done"
+exit 0
