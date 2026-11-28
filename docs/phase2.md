@@ -243,14 +243,20 @@ like `rk_gui_save_png()`.
   number of the button pressed) needs five arguments, and the interpreter's
   function dispatch stops at four. `filepanel` takes all four of yab's
   arguments: the mode, the title, the starting directory and the suggested name
-  a save panel starts with. That fourth argument is compulsory -- yab made it
-  so in 1.7, and current programs pass it even when it is empty -- and it is
-  only handed to the panel when the mode saves. yab's older three-argument form
-  is not accepted: side by side the two rules are ambiguous at the ',' after
-  the third argument, which would be a seventh shift/reduce conflict, and the
-  grammar is pinned at six; bison's answer to the ambiguity (shift) is the
-  four-argument reading, so that is the form the language keeps. The title goes
-  on the panel's own window, which is how yab sets it. `popupmenu`
+  a save panel starts with. That fourth argument is compulsory here, as it is
+  in yab 1.8, and it is only handed to the panel when the mode saves. It was
+  not a designed change: it appeared in yab 1.8 in August 2021, when the
+  translation function was reactivated and existing `Load-File` calls stopped
+  working until a trailing argument was added (yab forum, thread 140, posts 1
+  and 2, the second by yab's maintainer). The argument is the save panel's
+  suggested name, which a load panel has no use for, and the change never made
+  the change history. It is kept because yab software written since then passes
+  it, empty or not. yab's older three-argument form is not accepted: side by
+  side the two rules are ambiguous at the ',' after the third argument, which
+  would be a seventh shift/reduce conflict, and the grammar is pinned at six;
+  bison's answer to that ambiguity (shift) is the four-argument reading, so
+  that is the form the language keeps. The title goes on the panel's own
+  window, which is how yab sets it. `popupmenu`
   returns the chosen label; yab offers shortcuts and icons in it, which are not
   built here.
 * **Only the widget properties the tests need exist.** `option set` knows
@@ -1105,9 +1111,11 @@ The other two manual tests failed inside the tests, not the interpreter:
   so it is now 240 pixels tall (200, 200 to 420, 440), the same fix `m0102`
   needed.
 * `m0101-filepanel-popupmenu` stopped at its load panel, which passed yab's
-  four-argument form. That is the form the language now has -- the fourth
-  argument is compulsory since yab 1.7, so current programs all pass it, even
-  empty -- and the test keeps it in both branches.
+  four-argument form. That is the form the language now has: the trailing
+  suggested name became compulsory in yab 1.8, so software written since 2021
+  passes it, empty or not, and the test keeps it in both branches. It began as
+  the workaround described in the gaps list, which is why the panel ignores it
+  for everything but a save.
   Pressing each of its three buttons, and each of `m0100`'s six, is still a
   human check.
 

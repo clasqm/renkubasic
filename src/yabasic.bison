@@ -584,11 +584,12 @@ string_function: tLEFT '(' string_expression ',' expression ')' {create_function
      panel's chosen path. The panel takes a suggested name only when it saves. */
   | tPOPUPMENU coordinates ',' string_expression ',' string_expression %prec tARGUMENT {create_function(fYABPOPUPMENU);}
   /* yab's four-argument form, the one every current program uses: the suggested
-     name became compulsory in yab 1.7 even when it is empty. It is only passed
-     to the panel when the mode saves. yab's older three-argument form is NOT in
-     the grammar: side by side the two rules are ambiguous at the ',' after the
-     third argument, which would be a seventh shift/reduce conflict. See the
-     gaps list. */
+     name became compulsory in yab 1.8 even when it is empty, a workaround from
+     the translation change that the yab forum records (thread 140). It is only
+     passed to the panel when the mode saves. yab's older three-argument form is
+     NOT in the grammar: side by side the two rules are ambiguous at the ','
+     after the third argument, which would be a seventh shift/reduce conflict.
+     See the gaps list. */
   | tFILEPANEL string_expression ',' string_expression ',' string_expression ',' string_expression %prec tARGUMENT {create_function(fYABFILEPANEL);}
   /* The list family's string getters. `get$` returns the item text; the plain
      `get` a few lines down in big_function returns the selected position, as
