@@ -1133,8 +1133,21 @@ things in the panel did not match yab and are fixed:
 * the title argument was dropped as unusable; it is the panel window's title,
   which is what yab's own panel class sets, so it is set here too.
 
-`m0101` now prints a line before and after each panel and the popup, so a hang
-in the next run names the call it stopped in instead of only timing out.
+The next run answered the question the step markers were added for: stderr
+showed "step: load panel" and then nothing for the full 300 seconds, so the
+wait began and the panel never reported. The panel had been constructed
+non-modal, and a normal window opened by a program whose own window covers the
+centre of the screen is placed *behind* that window: there was nothing on top
+to click. yab's panel is modal -- it passes `true` for `BFilePanel`'s
+`modal` argument -- and a modal window is kept above the application's other
+windows, so the panel now asks for the same. `BFilePanel` positions itself like
+an alert, over the middle of the screen, which is exactly where `m0101`'s
+200, 200 to 620, 420 window sits.
+
+`rk_yab_filepanel` also traces itself to stderr now -- the panel is open, the
+panel reported a file, a saved name or a cancel, the panel answered -- so a
+manual run says where it stopped without the runner's timeout being the only
+evidence.
 
 Next slice: `mouse message$` and `keyboard message$`, which now have a queue to
 feed.

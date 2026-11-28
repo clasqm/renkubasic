@@ -5617,6 +5617,13 @@ const char *rk_yab_popupmenu(double x, double y, const char *items,
   return result.c_str();
 }
 
+/* The panel stops the program until it answers, so a panel that never answers
+   has to be visible in the log rather than only as a hang: these two lines are
+   what a manual test's stderr shows. */
+static void panel_trace(const char *text) {
+  fprintf(stderr, "rk_yab: %s\n", text);
+}
+
 /* BFilePanel reports its result as a message, but yab's `filepanel` is a
    function the program waits on. The panel's target is a looper of our own: it
    records the chosen path and releases the wait the caller sits in. */
@@ -5641,6 +5648,7 @@ public:
           chosen = path.Path();
         }
       }
+      panel_trace("filepanel: the panel reported a chosen file");
       release_sem(waiting);
       return;
     }
@@ -5657,10 +5665,12 @@ public:
           chosen = path.Path();
         }
       }
+      panel_trace("filepanel: the panel reported a saved name");
       release_sem(waiting);
       return;
     }
     if (message->what == B_CANCEL) {
+      panel_trace("filepanel: the panel was cancelled");
       release_sem(waiting);
       return;
     }
@@ -5710,8 +5720,11 @@ const char *rk_yab_filepanel(const char *mode, const char *title,
      relies on by passing none of its own. The messenger is copied by the
      panel, as the header's by-value Messenger() shows. */
   BMessenger messenger(looper);
+  /* Modal, as yab's panel is: a modal window is kept above the program's own
+     windows. A normal one is placed behind them, where it cannot be clicked,
+     and this function then waits for an answer that never comes. */
   BFilePanel *panel = new BFilePanel(panel_mode, &messenger, NULL, flavours,
-                                     false, NULL, NULL, false, true);
+                                     false, NULL, NULL, true, true);
   /* BFilePanel has no title of its own; the title yab shows is its panel
      window's, and its own class sets exactly that. */
   if (title && *title && panel->Window() != NULL) {
@@ -5726,7 +5739,9 @@ const char *rk_yab_filepanel(const char *mode, const char *title,
     panel->SetSaveText(filename);
   }
   panel->Show();
+  panel_trace("filepanel: the panel is open");
   acquire_sem(looper->waiting);
+  panel_trace("filepanel: the panel answered");
   panel->Hide();
   delete panel;
   if (looper->chosen.Length() > 0) {
