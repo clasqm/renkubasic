@@ -181,6 +181,8 @@ int rk_yab_tabview(double x1, double y1, double x2, double y2, const char *id,
 int rk_yab_tab_add(const char *id, const char *label);
 int rk_yab_tab_set(const char *id, double index);
 int rk_yab_tab_remove(const char *id, double index);
+/* `tabview get(id)`: the selected tab, 1-based, as yab returns it. */
+int rk_yab_tabview_get(const char *id);
 
 /* `boxview ... , "label", line_type, view`: 0 no border, 1 plain, 2 fancy. */
 int rk_yab_boxview(double x1, double y1, double x2, double y2, const char *id,
@@ -192,9 +194,20 @@ int rk_yab_boxview_set(const char *id, const char *option, const char *value);
 int rk_yab_splitview(double x1, double y1, double x2, double y2,
                      const char *id, int vertical, int style,
                      const char *view);
+/* `splitview set id, "divider", position` and
+   `splitview set id, "minimumsizes", left, right`. The bar position counts
+   from the split's left or top edge, as SplitPane's does, and is clamped so
+   neither pane falls below its minimum size. */
+int rk_yab_splitview_set(const char *id, const char *option, double position);
+int rk_yab_splitview_minimums(const char *id, const char *option, double left,
+                              double right);
+/* `splitview get(id, "divider")`: the bar position in the same pixels. */
+double rk_yab_splitview_get(const char *id, const char *option);
 int rk_yab_stackview(double x1, double y1, double x2, double y2,
                      const char *id, int count, const char *view);
 int rk_yab_stackview_set(const char *id, double index);
+/* `stackview get(id)`: the selected page, 1-based. */
+int rk_yab_stackview_get(const char *id);
 
 /* A canvas and a region are drawable views; a region is meant to clip drawing
    to its rectangle inside its parent view. */

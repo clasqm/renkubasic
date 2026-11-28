@@ -1345,6 +1345,8 @@ static void initialize(void)
   cexplanation[cYABBOXVIEW] = "YABBOXVIEW";
   cexplanation[cYABBOXVIEWSET] = "YABBOXVIEWSET";
   cexplanation[cYABSPLITVIEW] = "YABSPLITVIEW";
+  cexplanation[cYABSPLITVIEWSET] = "YABSPLITVIEWSET";
+  cexplanation[cYABSPLITVIEWMIN] = "YABSPLITVIEWMIN";
   cexplanation[cYABSTACKVIEW] = "YABSTACKVIEW";
   cexplanation[cYABSTACKVIEWSET] = "YABSTACKVIEWSET";
   cexplanation[cYABCANVAS] = "YABCANVAS";
@@ -1533,6 +1535,9 @@ static void initialize(void)
   fexplanation[fYABNUMWINDOWS] = "YABNUMWINDOWS";
   fexplanation[fYABCLIPBOARDPASTE] = "YABCLIPBOARDPASTE";
   fexplanation[fYABMESSAGE] = "YABMESSAGE";
+  fexplanation[fYABTABVIEWGET] = "YABTABVIEWGET";
+  fexplanation[fYABSTACKVIEWGET] = "YABSTACKVIEWGET";
+  fexplanation[fYABSPLITVIEWGET] = "YABSPLITVIEWGET";
   fexplanation[fYABATTRIBUTEGET] = "YABATTRIBUTEGET";
   fexplanation[fYABATTRIBUTEGETNUM] = "YABATTRIBUTEGETNUM";
   fexplanation[fYABBFILESIZE] = "YABBFILESIZE";
@@ -2070,6 +2075,8 @@ static void run_it()
       case cYABBOXVIEW:
       case cYABBOXVIEWSET:
       case cYABSPLITVIEW:
+      case cYABSPLITVIEWSET:
+      case cYABSPLITVIEWMIN:
       case cYABSTACKVIEW:
       case cYABSTACKVIEWSET:
       case cYABCANVAS:

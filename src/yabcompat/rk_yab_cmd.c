@@ -640,6 +640,23 @@ void rk_yab_command(struct command *cmd) {
     expect(rk_yab_splitview(x1, y1, x2, y2, id, vertical, style, view));
     break;
   }
+  case cYABSPLITVIEWSET: {
+    double position = take_number();
+    char *option = take_string();
+    char *id = take_string();
+
+    expect(rk_yab_splitview_set(id, option, position));
+    break;
+  }
+  case cYABSPLITVIEWMIN: {
+    double right = take_number();
+    double left = take_number();
+    char *option = take_string();
+    char *id = take_string();
+
+    expect(rk_yab_splitview_minimums(id, option, left, right));
+    break;
+  }
   case cYABSTACKVIEW: {
     char *view = take_string();
     int pages = (int)take_number();

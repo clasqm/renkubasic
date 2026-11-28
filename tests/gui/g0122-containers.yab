@@ -1,0 +1,47 @@
+// RenkuBASIC GUI test: split view geometry and the container getters
+// Derived from: yab 1.8.3's `splitview set`/`splitview get` and the
+//               `tabview get`/`stackview get` forms (YabInterface's
+//               SplitView/SplitViewGet/TabViewGet/StackViewGet).
+
+// @requires: gui-widgets
+// @timeout: 20
+
+import harness
+
+window open 100, 100 to 560, 420, "rk_cont_win", "RenkuBASIC containers"
+layout "left, top", "rk_cont_win"
+
+// A split view starts with its bar in the middle and moves it where asked.
+splitview 10, 220 to 260, 300, "rk_split", true, false, "rk_cont_win"
+splitview set "rk_split", "divider", 60
+assert_eq(splitview get "rk_split", "divider", 60, "the divider reports where it was put")
+
+// The minimum sizes clamp the bar, so no pane can be squeezed out.
+splitview set "rk_split", "minimumsizes", 100, 40
+assert_eq(splitview get "rk_split", "divider", 100, "the first minimum size clamps the divider")
+splitview set "rk_split", "divider", 999
+span = 260 - 10 + 1
+assert_eq(splitview get "rk_split", "divider", span - 5 - 40, "the second minimum size clamps the divider")
+
+// The panes are still drawable after the bar moved.
+draw set "bgcolor", 220, 220, 240, "rk_split1"
+draw set "bgcolor", 240, 220, 220, "rk_split2"
+
+// A tab view reports the tab that is selected, 1-based.
+tabview 10, 10 to 260, 200, "rk_tabs", "top", "rk_cont_win"
+tabview add "rk_tabs", "First"
+tabview add "rk_tabs", "Second"
+assert_eq(tabview get "rk_tabs", 1, "the first tab is selected")
+tabview set "rk_tabs", 2
+assert_eq(tabview get "rk_tabs", 2, "the second tab is selected")
+
+// A stack view reports the page that is shown, 1-based.
+stackview 280, 10 to 440, 120, "rk_stack", 3, "rk_cont_win"
+assert_eq(stackview get "rk_stack", 1, "the first stack page is shown")
+stackview set "rk_stack", 3
+assert_eq(stackview get "rk_stack", 3, "the third stack page is shown")
+
+sleep 0.1
+window close "rk_cont_win"
+print "g0122 done"
+exit 0

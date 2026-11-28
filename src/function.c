@@ -941,6 +941,23 @@ void function(struct command *cmd) /* performs a function */
     rk_yab_check();
     result = stNUMBER;
     break;
+  /* The containers' getters: a split view's bar position (the option names
+     what is read) and a tab or stack view's selected page. */
+  case fYABSPLITVIEWGET:
+    value = rk_yab_splitview_get(a1->pointer, a2->pointer);
+    rk_yab_check();
+    result = stNUMBER;
+    break;
+  case fYABTABVIEWGET:
+    value = (double)rk_yab_tabview_get(a1->pointer);
+    rk_yab_check();
+    result = stNUMBER;
+    break;
+  case fYABSTACKVIEWGET:
+    value = (double)rk_yab_stackview_get(a1->pointer);
+    rk_yab_check();
+    result = stNUMBER;
+    break;
   case fYABDRAWGET:
     value = rk_yab_view_get(a1->pointer, a2->pointer);
     rk_yab_check();

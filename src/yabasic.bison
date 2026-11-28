@@ -404,6 +404,8 @@ statement:  /* empty */
   | tBOXVIEW coordinates to coordinates ',' string_expression ',' string_expression ',' expression ',' string_expression {add_command(cYABBOXVIEW);}
   | tBOXVIEW tSET string_expression ',' string_expression ',' string_expression {add_command(cYABBOXVIEWSET);}
   | tSPLITVIEW coordinates to coordinates ',' string_expression ',' expression ',' expression ',' string_expression {add_command(cYABSPLITVIEW);}
+  | tSPLITVIEW tSET string_expression ',' string_expression ',' expression {add_command(cYABSPLITVIEWSET);}
+  | tSPLITVIEW tSET string_expression ',' string_expression ',' expression ',' expression {add_command(cYABSPLITVIEWMIN);}
   | tSTACKVIEW coordinates to coordinates ',' string_expression ',' expression ',' string_expression {add_command(cYABSTACKVIEW);}
   | tSTACKVIEW tSET string_expression ',' expression {add_command(cYABSTACKVIEWSET);}
   | tCANVAS coordinates to coordinates ',' string_expression ',' string_expression {add_command(cYABCANVAS);}
@@ -739,6 +741,9 @@ function: tSIN '(' expression ')' {create_function(fSIN);}
   | tCOLUMNBOX tCOUNT tCOLUMN string_expression %prec tARGUMENT {create_function(fYABCOLUMNBOXCOUNTCOLUMNS);}
   | tCOLUMNBOX tGET string_expression %prec tARGUMENT {create_function(fYABCOLUMNBOXSELECTED);}
   | tCOLORCONTROL tGET string_expression ',' string_expression %prec tARGUMENT {create_function(fYABCOLORCONTROLGET);}
+  | tSPLITVIEW tGET string_expression ',' string_expression %prec tARGUMENT {create_function(fYABSPLITVIEWGET);}
+  | tSTACKVIEW tGET string_expression %prec tARGUMENT {create_function(fYABSTACKVIEWGET);}
+  | tTABVIEW tGET string_expression %prec tARGUMENT {create_function(fYABTABVIEWGET);}
   | tDRAW tGET string_expression ',' string_expression {create_function(fYABDRAWGET);}
   | tDRAW tGET string_expression ',' string_expression ',' string_expression {create_function(fYABDRAWGETTEXT);}
   | tBFILESIZE '(' string_expression ')' {create_function(fYABBFILESIZE);}

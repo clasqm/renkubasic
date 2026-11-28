@@ -216,8 +216,9 @@ like `rk_gui_save_png()`.
   with level skipping, as in yab, so sorting keeps each item under its parent.
 * **Widgets are the controls, not yab's custom classes.** A `boxview` is a
   `BBox`, so it has no drawable child view of its own; tab pages are empty
-  `BView`s; a split view has two panes with a fixed gap instead of a draggable
-  divider; `scrollbar` attaches bars to the window over the view's edges rather
+  `BView`s; a split view has two panes whose bar only `splitview set` moves,
+  because a yab view is an offscreen bitmap at a fixed rectangle and cannot
+  follow a dragged bar; `scrollbar` attaches bars to the window over the view's edges rather
   than scrolling its contents; a spin control is a text field with `+`/`-`
   buttons, because Haiku has no spinner; `textedit` wraps but has no scrollbars
   yet; and `texturl` keeps its link as a tool tip, since there is no URL
@@ -872,5 +873,51 @@ What the next Haiku run has to show: GUI 18 / 0 / 0 with `g0121-messages`
 passing (a new window reports `_Activated`), and the CLI suite unchanged at
 40 / 0 / 2.
 
-Next slice: the tab/box/split polish the gaps list names, then `mouse message$`
-and `keyboard message$`.
+**Round 14 (2026-11-28).** Split view geometry and the container getters.
+
+The three container views had only their creation commands; yab's `set` and
+`get` forms were missing. Notes:
+
+* Five commands are new: `splitview set id, "divider", position`,
+  `splitview set id, "minimumsizes", left, right`,
+  `splitview get(id, "divider")`, `tabview get(id)` and `stackview get(id)`.
+  They are grammar additions only -- `splitview` and the other two were already
+  keywords, and `get`/`set` already follow them -- so the grammar still
+  regenerates with exactly six conflicts.
+* A split view is registered as a widget now (it was two anonymous views), and
+  it keeps what yab's SplitPane keeps: its frame, its orientation, the bar
+  thickness, the bar position and the two panes' minimum sizes. Moving the bar
+  or setting a minimum lays the two panes out again from that state.
+* The bar position counts from the split's left or top edge, as
+  `SplitPane::GetBarPosition()` returns it, and is clamped so neither pane
+  falls below its minimum -- the same clamp `SplitPane::Update()` applies, and
+  the reason `splitview get` can report a number other than the one that was
+  set. The panes are opened at their own size, so `draw get "width"` on a pane
+  still reports the pane and not the whole split.
+* The options are found as yab finds them, by a case-insensitive substring
+  (`BString::IFindFirst`): "Divider" and "divider bar" both name the bar, and
+  "minimumsizes" matches SplitPane's "MinimumSizes". Any other option is a
+  runtime error naming it.
+* `tabview get` asks `BTabView` for its own selection, so it follows a tab the
+  user clicks; a stack view keeps its page in the widget entry, because its
+  pages are RenkuBASIC's own views and not a Haiku control.
+* The bar still has no drag handle (see the gaps list). Haiku's `BSplitView`
+  moves real child views, while a yab view here is an offscreen bitmap
+  composited at a fixed rectangle, so a dragged bar would have to move the
+  panes' rectangles and their contents. `splitview set` is how a program moves
+  it.
+
+Checked here (Linux, no app_server): the grammar regenerates with the same six
+conflicts; all C sources plus the stub bridges build and link; the new `g0122`
+runs green against the stub, which repeats the bar clamp so the test exercises
+it; `g0115`, the older container test, still runs green; the CLI suite stays at
+35 / 0 / 7; and `rk_yab.cpp` passes `g++ -fsyntax-only` against Haiku's public
+headers. Not checked: app_server -- no bar has been moved on screen here, so
+whether the panes are redrawn where the geometry says they are is the next
+run's business.
+
+What the next Haiku run has to show: GUI 19 / 0 / 0 with `g0122-containers`
+passing as well as `g0121-messages`, and the CLI suite unchanged at 40 / 0 / 2.
+
+Next slice: `mouse message$` and `keyboard message$`, which now have a queue to
+feed.

@@ -425,8 +425,8 @@ bool refresh_window(YabWindow *window) {
 enum YabWidgetKind {
   wkBUTTON, wkCHECKBOX, wkRADIO, wkLABEL, wkURL, wkTEXTCONTROL, wkTEXTEDIT,
   wkSLIDER, wkSPIN, wkSTATUSBAR, wkTABVIEW, wkBOXVIEW, wkSTACKVIEW,
-  wkSCROLLBAR, wkLISTBOX, wkDROPBOX, wkTREEBOX, wkCOLUMNBOX, wkCALENDAR,
-  wkCOLORCONTROL
+  wkSPLITVIEW, wkSCROLLBAR, wkLISTBOX, wkDROPBOX, wkTREEBOX, wkCOLUMNBOX,
+  wkCALENDAR, wkCOLORCONTROL
 };
 
 struct YabWidget {
@@ -438,6 +438,15 @@ struct YabWidget {
   BView *outer;  /* what was attached when it wraps view: a BScrollView or a
                     container view. NULL when view itself was attached. */
   int number;    /* pages of a stack view, bars of a scrollbar */
+  /* Containers that keep state: a stack view's selected page, and a split
+     view's geometry -- its bar position counted from the left or top edge of
+     its frame, the bar thickness and the two panes' minimum sizes. */
+  int selected;
+  BRect frame;
+  int vertical;
+  int thickness;
+  int divider;
+  int minimum[2];
   YabWidget *next;
 };
 
@@ -621,6 +630,13 @@ bool finish_widget_ex(YabWindow *window, YabWidgetKind kind, const char *id,
   widget->outer = outer;
   widget->extra = NULL;
   widget->number = number;
+  widget->selected = 1;
+  widget->frame = BRect(0, 0, 0, 0);
+  widget->vertical = 0;
+  widget->thickness = 0;
+  widget->divider = 0;
+  widget->minimum[0] = 0;
+  widget->minimum[1] = 0;
   widget->next = g_widgets;
   g_widgets = widget;
   /* The control is live in its window now, so its message is attached under
@@ -3318,6 +3334,61 @@ int rk_yab_boxview_set(const char *id, const char *option, const char *value) {
   return 1;
 }
 
+/* yab matches its option words by a case-insensitive substring
+   (BString::IFindFirst), so "Divider" also accepts "divider bar". */
+bool option_has(const char *option, const char *word) {
+  if (!option || !word || !*word) {
+    return false;
+  }
+  size_t len = strlen(word);
+  for (const char *at = option; *at; at++) {
+    if (strncasecmp(at, word, len) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/* Lay the two panes of a split view out again around its bar. The bar position
+   is counted from the split's left or top edge, like SplitPane's, and is
+   clamped so neither pane falls below its minimum size. */
+void layout_split(YabWidget *widget) {
+  char name[512];
+  YabView *panes[2] = {NULL, NULL};
+
+  for (int i = 0; i < 2; i++) {
+    snprintf(name, sizeof(name), "%s%d", widget->name, i + 1);
+    panes[i] = find_view(name);
+  }
+  float span = widget->vertical ? widget->frame.Width() + 1.0f
+                                : widget->frame.Height() + 1.0f;
+  int low = widget->minimum[0];
+  int high = (int)span - widget->thickness - widget->minimum[1];
+  if (high < low) {
+    high = low;
+  }
+  if (widget->divider < low) {
+    widget->divider = low;
+  }
+  if (widget->divider > high) {
+    widget->divider = high;
+  }
+  if (!panes[0] || !panes[1]) {
+    return;
+  }
+  BRect first = widget->frame;
+  BRect second = widget->frame;
+  if (widget->vertical) {
+    first.right = first.left + widget->divider - 1.0f;
+    second.left = first.left + widget->divider + widget->thickness;
+  } else {
+    first.bottom = first.top + widget->divider - 1.0f;
+    second.top = first.top + widget->divider + widget->thickness;
+  }
+  panes[0]->rect = first;
+  panes[1]->rect = second;
+}
+
 int rk_yab_splitview(double x1, double y1, double x2, double y2,
                      const char *id, int vertical, int style,
                      const char *view_name) {
@@ -3337,17 +3408,21 @@ int rk_yab_splitview(double x1, double y1, double x2, double y2,
   float right = (float)x2 + dx;
   float bottom = (float)y2 + dy;
   float thickness = style ? 10.0f : 5.0f;
-  float middle = vertical ? (left + right) / 2.0f : (top + bottom) / 2.0f;
-  BRect first;
-  BRect second;
-  if (vertical) {
-    first.Set(left, top, middle - thickness / 2.0f, bottom);
-    second.Set(middle + thickness / 2.0f, top, right, bottom);
-  } else {
-    first.Set(left, top, right, middle - thickness / 2.0f);
-    second.Set(left, middle + thickness / 2.0f, right, bottom);
-  }
   char name[512];
+
+  /* The bar starts in the middle. The panes are opened at their own size, so
+     `draw get "width"` on a pane reports the pane and not the whole split. */
+  float span = vertical ? (right - left + 1.0f) : (bottom - top + 1.0f);
+  int divider = (int)((span - thickness) / 2.0f);
+  BRect first(left, top, right, bottom);
+  BRect second(left, top, right, bottom);
+  if (vertical) {
+    first.right = left + divider - 1.0f;
+    second.left = left + divider + thickness;
+  } else {
+    first.bottom = top + divider - 1.0f;
+    second.top = top + divider + thickness;
+  }
   snprintf(name, sizeof(name), "%s1", id);
   if (!open_view_at(window, first.left, first.top, first.right, first.bottom,
                     name)) {
@@ -3358,7 +3433,101 @@ int rk_yab_splitview(double x1, double y1, double x2, double y2,
                     second.bottom, name)) {
     return 0;
   }
+  YabWidget *widget = NULL;
+  if (!finish_widget_ex(window, wkSPLITVIEW, id, NULL, NULL, 0, 0, &widget)) {
+    return 0;
+  }
+  widget->frame = BRect(left, top, right, bottom);
+  widget->vertical = vertical ? 1 : 0;
+  widget->thickness = (int)thickness;
+  widget->divider = divider;
+  layout_split(widget);
   return refresh_window(window) ? 1 : 0;
+}
+
+int rk_yab_splitview_set(const char *id, const char *option, double position) {
+  clear_error();
+  YabWidget *widget = find_widget(id);
+  if (!widget || widget->kind != wkSPLITVIEW) {
+    snprintf(g_error, sizeof(g_error),
+             "splitview set: '%s' is not a split view", id ? id : "");
+    return 0;
+  }
+  if (!option_has(option, "divider")) {
+    snprintf(g_error, sizeof(g_error),
+             "splitview set: '%s' is not a split view option",
+             option ? option : "");
+    return 0;
+  }
+  widget->divider = (int)position;
+  layout_split(widget);
+  return refresh_window(widget->window) ? 1 : 0;
+}
+
+int rk_yab_splitview_minimums(const char *id, const char *option, double left,
+                              double right) {
+  clear_error();
+  YabWidget *widget = find_widget(id);
+  if (!widget || widget->kind != wkSPLITVIEW) {
+    snprintf(g_error, sizeof(g_error),
+             "splitview set: '%s' is not a split view", id ? id : "");
+    return 0;
+  }
+  if (!option_has(option, "minimumsizes")) {
+    snprintf(g_error, sizeof(g_error),
+             "splitview set: '%s' is not a split view option",
+             option ? option : "");
+    return 0;
+  }
+  widget->minimum[0] = left > 0.0 ? (int)left : 0;
+  widget->minimum[1] = right > 0.0 ? (int)right : 0;
+  layout_split(widget);
+  return refresh_window(widget->window) ? 1 : 0;
+}
+
+double rk_yab_splitview_get(const char *id, const char *option) {
+  clear_error();
+  YabWidget *widget = find_widget(id);
+  if (!widget || widget->kind != wkSPLITVIEW) {
+    snprintf(g_error, sizeof(g_error),
+             "splitview get: '%s' is not a split view", id ? id : "");
+    return 0;
+  }
+  if (!option_has(option, "divider")) {
+    snprintf(g_error, sizeof(g_error),
+             "splitview get: '%s' is not a split view option",
+             option ? option : "");
+    return 0;
+  }
+  return (double)widget->divider;
+}
+
+int rk_yab_stackview_get(const char *id) {
+  clear_error();
+  YabWidget *widget = find_widget(id);
+  if (!widget || widget->kind != wkSTACKVIEW) {
+    snprintf(g_error, sizeof(g_error),
+             "stackview get: '%s' is not a stack view", id ? id : "");
+    return 0;
+  }
+  return widget->selected;
+}
+
+int rk_yab_tabview_get(const char *id) {
+  clear_error();
+  YabWidget *widget = find_widget(id);
+  if (!widget || widget->kind != wkTABVIEW) {
+    snprintf(g_error, sizeof(g_error),
+             "tabview get: '%s' is not a tab view", id ? id : "");
+    return 0;
+  }
+  if (!lock_widget(widget)) {
+    return 0;
+  }
+  BTabView *tabs = (BTabView *)widget->view;
+  int32 selected = tabs->Selection();
+  widget->window->window->Unlock();
+  return (int)selected + 1;
 }
 
 int rk_yab_stackview(double x1, double y1, double x2, double y2,
@@ -3408,6 +3577,7 @@ int rk_yab_stackview_set(const char *id, double index) {
              selected);
     return 0;
   }
+  widget->selected = selected;
   for (int i = 1; i <= widget->number; i++) {
     char name[512];
     snprintf(name, sizeof(name), "%s%d", id, i);
