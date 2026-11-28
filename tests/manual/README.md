@@ -19,6 +19,7 @@ ends because you closed its window passes, and a program that crashes fails.
 | `m0100-alerts.yab` | click each of the five alert buttons, then Quit | five different icons; readable text; Quit ends the program |
 | `m0101-filepanel-popupmenu.yab` | Load file, Save file, Popup, then close the window | panels open on `/boot/home`, cancelling changes nothing, the chosen file/menu entry is shown |
 | `m0102-widget-messages.yab` | use every widget, type into the text control | each action prints a message in the view; the text format matches yab 1.8.3; closing ends the program |
+| `m0103-audio.yab` | listen to the seven steps it prints | the WAV plays once, loops, pauses, resumes and stops; the MP3 plays through the media kit |
 
 ## Why these are separate
 
@@ -30,8 +31,12 @@ the message string a yab program expects. Those two things are checked here.
 
 ## Sound and media
 
-`mediasound` and `sound` are left to the maintainer's own check with a real
-media file: the reference examples use `Examples/yab_testsong.mp3`, which is not
-part of this repository. The commands are exercised automatically only to the
-extent that they parse (see `tests/gui/g0114-slider-status.yab` for the volume
-poke and `docs/platform-inventory.md` §5 for the command list).
+A test cannot hear anything, so the audio commands are split in two:
+`tests/gui/g0123-audio.yab` checks that `sound play`/`sound stop`/`sound wait`,
+`mediasound play`/`mediasound stop` and `loudness get` start, pause, resume and
+stop a real file without leaving a player behind, and `m0103-audio.yab` is the
+listening test. Both use `tests/INTRO.WAV` (short, WAV) and
+`tests/Anchors_Aweigh.mp3` (MP3, so the media kit's decoder is exercised), which
+the runner copies next to the program through their `@data:` lines. The whole
+group skips when the `audio` capability probe fails, so a machine without a
+sound device reports `SKIP` rather than a failure.

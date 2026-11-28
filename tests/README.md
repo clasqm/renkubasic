@@ -60,7 +60,10 @@ in a `.yab` file or `# @key: value` in a `.sh` file.
 | `@requires: pty` | skip when `script(1)` is missing |
 | `@requires: ffi` | skip when the foreign function interface answers nothing |
 | `@requires: haiku` | skip unless `peek$("os")` is `haiku` or `renkuos` |
+| `@requires: attributes` | skip when file attributes cannot be written and read back |
+| `@requires: audio` | skip when `sound play`, `sound stop` or `loudness get` fails |
 | `@stdin: fixtures/digits.txt` | feed this file (relative to `tests/`) on stdin |
+| `@data: INTRO.WAV` | copy these files (relative to `tests/`, space separated) into the test's directory |
 | `@expect-exit: 1` | the program is supposed to fail with status 1 |
 | `@expect-stdout-contains: text` | stdout must contain `text` |
 | `@expect-stderr-contains: text` | stderr must contain `text` |
@@ -180,6 +183,7 @@ interpreter.
 | g0120-bitmap | screenshot, `bitmap get`, `draw bitmap`, `bitmap remove` | `IconWorld.yab`, `FakeTransparency.yab`, `3D-Curve.yab` |
 | g0121-messages | `message$`, the widget event queue | `WindowWorld.yab`, `MessageWorld.yab` |
 | g0122-containers | `splitview set`/`get`, `tabview get`, `stackview get` | yab grammar |
+| g0123-audio | `sound play`/`stop`/`wait`, `mediasound play`/`stop`, `loudness get` | `MediaSound.yab`, `Sound.yab` |
 | g0130-yabasic-graphics | yabasic graphic window, primitives, `getbit$`/`putbit`, origin | yabasic manual |
 | g0131-yabasic-printer | `open printer "file"`, PostScript output, page break | yabasic manual |
 

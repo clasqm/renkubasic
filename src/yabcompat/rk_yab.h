@@ -362,6 +362,29 @@ const char *rk_yab_menu_translate(const char *text);
 /* `message$`: every widget event collected since the last call. */
 const char *rk_yab_message(void);
 
+/* ---- audio ------------------------------------------------------------- */
+
+/* `sound play path$, loop` starts a file through the game kit; `loop` other
+   than 0 repeats it until it is stopped. Only one sound plays at a time: a new
+   one replaces the previous. Returns 1 on success, 0 with the reason in
+   rk_yab_last_error(). */
+int rk_yab_sound_play(const char *path, int loop);
+/* `sound stop n`: stops whatever `sound play` started; the argument yab passes
+   is not needed and is not part of this interface. */
+int rk_yab_sound_stop(void);
+/* `sound wait n`: pauses a playing sound, resumes a paused one. */
+int rk_yab_sound_pause(void);
+
+/* `mediasound play path$`: decodes the first audio track of any file the media
+   kit understands and plays it. `mediasound stop n` stops it. */
+int rk_yab_mediasound_play(const char *path);
+int rk_yab_mediasound_stop(void);
+
+/* `loudness set volume` and `loudness get`: the audio mixer's master gain,
+   clamped by the mixer's own minimum and maximum. */
+int rk_yab_loudness_set(double volume);
+double rk_yab_loudness_get(void);
+
 /* ---- dialogs ----------------------------------------------------------- */
 
 /* `alert text$, button$, icon$`: yab's one-button alert. The icon is matched

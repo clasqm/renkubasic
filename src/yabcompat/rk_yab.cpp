@@ -39,12 +39,16 @@
 #include <ColorControl.h>
 #include <Entry.h>
 #include <File.h>
+#include <FileGameSound.h>
 #include <FilePanel.h>
 #include <Font.h>
 #include <fs_attr.h> /* attr_info, for the file attribute commands */
 #include <ListItem.h>
 #include <ListView.h>
 #include <Looper.h>
+#include <MediaFile.h>
+#include <MediaRoster.h>
+#include <MediaTrack.h>
 #include <Menu.h>
 #include <MenuBar.h>
 #include <MenuField.h>
@@ -55,6 +59,7 @@
 #include <NodeInfo.h>
 #include <OS.h>
 #include <OutlineListView.h>
+#include <ParameterWeb.h>
 #include <Path.h>
 #include <PopUpMenu.h>
 #include <RadioButton.h>
@@ -62,6 +67,7 @@
 #include <ScrollView.h>
 #include <SeparatorItem.h>
 #include <Slider.h>
+#include <SoundPlayer.h>
 #include <StatusBar.h>
 #include <String.h>
 #include <StringItem.h>
@@ -5236,6 +5242,281 @@ const char *rk_yab_menu_translate(const char *text) {
   /* yab splits a menu key on ':' and translates each part; with no catalog
      every part keeps its text, so the key comes back unchanged. */
   return rk_yab_translate(text);
+}
+
+/* ---- audio ------------------------------------------------------------- */
+
+/* yab's three audio families share one rule: only one sound plays at a time,
+   and starting another replaces whatever was playing. That is why yab's `sound
+   stop` and `mediasound stop` take an argument and ignore it -- there is one
+   player, not a list. `sound` goes through the game kit, `mediasound` decodes
+   any file the media kit understands into a BSoundPlayer, and `loudness` is the
+   audio mixer's master gain. */
+
+BFileGameSound *g_game_sound = NULL; /* `sound play` */
+BSoundPlayer *g_media_player = NULL; /* `mediasound play` */
+BMediaFile *g_media_file = NULL;
+BMediaTrack *g_media_track = NULL;
+
+void stop_game_sound(void) {
+  if (!g_game_sound) {
+    return;
+  }
+  g_game_sound->StopPlaying();
+  delete g_game_sound;
+  g_game_sound = NULL;
+}
+
+void stop_media_sound(void) {
+  if (g_media_player) {
+    /* Stop() waits for the callback, so the track can be released after it. */
+    g_media_player->Stop();
+    delete g_media_player;
+    g_media_player = NULL;
+  }
+  if (g_media_file) {
+    if (g_media_track) {
+      g_media_file->ReleaseTrack(g_media_track);
+      g_media_track = NULL;
+    }
+    delete g_media_file;
+    g_media_file = NULL;
+  }
+}
+
+/* The BSoundPlayer callback: hand the next frames of the track to the player,
+   and tell it when the file has run out. */
+void media_play_buffer(void *, void *buffer, size_t size,
+                       const media_raw_audio_format &format) {
+  (void)size;
+  (void)format;
+  if (!g_media_track || !g_media_player) {
+    if (g_media_player) {
+      g_media_player->SetHasData(false);
+    }
+    return;
+  }
+  int64 frames = 0;
+  g_media_track->ReadFrames(buffer, &frames);
+  if (frames <= 0) {
+    g_media_player->SetHasData(false);
+  }
+}
+
+int rk_yab_sound_play(const char *path, int loop) {
+  clear_error();
+  if (!path || !*path) {
+    set_error("sound play: a file is needed");
+    return 0;
+  }
+  if (!rk_gui_ensure_app()) {
+    set_error(rk_gui_last_error());
+    if (!g_error[0]) {
+      set_error("sound play: the application is not running");
+    }
+    return 0;
+  }
+  stop_game_sound();
+  BFileGameSound *sound = new BFileGameSound(path, loop != 0);
+  if (!sound || sound->InitCheck() != B_OK) {
+    delete sound;
+    snprintf(g_error, sizeof(g_error), "sound play: '%s' is not a sound file",
+             path);
+    return 0;
+  }
+  if (sound->StartPlaying() != B_OK) {
+    delete sound;
+    snprintf(g_error, sizeof(g_error), "sound play: could not start '%s'",
+             path);
+    return 0;
+  }
+  g_game_sound = sound;
+  return 1;
+}
+
+int rk_yab_sound_stop(void) {
+  clear_error();
+  stop_game_sound();
+  return 1;
+}
+
+/* yab's `sound wait` pauses a playing sound and resumes a paused one; with
+   nothing playing it does nothing (yab would dereference a null player). */
+int rk_yab_sound_pause(void) {
+  clear_error();
+  if (!g_game_sound) {
+    return 1;
+  }
+  g_game_sound->SetPaused(g_game_sound->IsPaused() == BFileGameSound::B_NOT_PAUSED,
+                          0);
+  return 1;
+}
+
+int rk_yab_mediasound_play(const char *path) {
+  clear_error();
+  if (!path || !*path) {
+    set_error("mediasound play: a file is needed");
+    return 0;
+  }
+  if (!rk_gui_ensure_app()) {
+    set_error(rk_gui_last_error());
+    if (!g_error[0]) {
+      set_error("mediasound play: the application is not running");
+    }
+    return 0;
+  }
+  entry_ref ref;
+  if (get_ref_for_path(path, &ref) != B_OK) {
+    snprintf(g_error, sizeof(g_error),
+             "mediasound play: '%s' is not a file", path);
+    return 0;
+  }
+  BMediaFile *file = new BMediaFile(&ref);
+  if (!file || file->InitCheck() != B_OK) {
+    delete file;
+    snprintf(g_error, sizeof(g_error),
+             "mediasound play: '%s' is not a media file", path);
+    return 0;
+  }
+  /* The first track that decodes to raw audio is the one to play; yab does the
+     same and leaves the other tracks alone. */
+  BMediaTrack *track = NULL;
+  media_format format;
+  for (int32 i = 0; i < file->CountTracks(); i++) {
+    BMediaTrack *candidate = file->TrackAt(i);
+    if (!candidate) {
+      continue;
+    }
+    media_format candidate_format;
+    candidate_format.type = B_MEDIA_RAW_AUDIO;
+    if (candidate->DecodedFormat(&candidate_format) == B_OK &&
+        candidate_format.type == B_MEDIA_RAW_AUDIO) {
+      track = candidate;
+      format = candidate_format;
+      break;
+    }
+    file->ReleaseTrack(candidate);
+  }
+  if (!track) {
+    delete file;
+    snprintf(g_error, sizeof(g_error),
+             "mediasound play: '%s' has no audio track", path);
+    return 0;
+  }
+  stop_media_sound();
+  BSoundPlayer *player = new BSoundPlayer(&format.u.raw_audio,
+                                          "RenkuBASIC media", media_play_buffer);
+  if (!player || player->InitCheck() != B_OK) {
+    delete player;
+    file->ReleaseTrack(track);
+    delete file;
+    set_error("mediasound play: the audio output is not available");
+    return 0;
+  }
+  g_media_file = file;
+  g_media_track = track;
+  g_media_player = player;
+  player->SetHasData(true);
+  player->Start();
+  return 1;
+}
+
+int rk_yab_mediasound_stop(void) {
+  clear_error();
+  stop_media_sound();
+  return 1;
+}
+
+/* The mixer's master gain, as yab reads it: ask the media roster for the audio
+   mixer, then look for the parameter whose kind is B_MASTER_GAIN. The web owns
+   its parameters, so the caller has to delete the web after using the gain. */
+BParameterWeb *master_gain_web(BContinuousParameter **gain) {
+  *gain = NULL;
+  BMediaRoster *roster = BMediaRoster::Roster();
+  if (!roster) {
+    return NULL;
+  }
+  media_node mixer;
+  if (roster->GetAudioMixer(&mixer) != B_OK) {
+    return NULL;
+  }
+  BParameterWeb *web = NULL;
+  status_t status = roster->GetParameterWebFor(mixer, &web);
+  roster->ReleaseNode(mixer);
+  if (status != B_OK || !web) {
+    delete web;
+    return NULL;
+  }
+  for (int32 index = 0; web->ParameterAt(index) != NULL; index++) {
+    BParameter *parameter = web->ParameterAt(index);
+    if (strcmp(parameter->Kind(), B_MASTER_GAIN) == 0) {
+      *gain = dynamic_cast<BContinuousParameter *>(parameter);
+      break;
+    }
+  }
+  if (!*gain) {
+    delete web;
+    return NULL;
+  }
+  return web;
+}
+
+int rk_yab_loudness_set(double volume) {
+  clear_error();
+  if (!rk_gui_ensure_app()) {
+    set_error(rk_gui_last_error());
+    if (!g_error[0]) {
+      set_error("loudness set: the application is not running");
+    }
+    return 0;
+  }
+  BContinuousParameter *gain = NULL;
+  BParameterWeb *web = master_gain_web(&gain);
+  if (!web) {
+    set_error("loudness set: the audio mixer is not available");
+    return 0;
+  }
+  float value = (float)volume;
+  if (value < gain->MinValue()) {
+    value = gain->MinValue();
+  }
+  if (value > gain->MaxValue()) {
+    value = gain->MaxValue();
+  }
+  status_t status = gain->SetValue(&value, sizeof(value), system_time());
+  delete web;
+  if (status != B_OK) {
+    set_error("loudness set: the mixer did not answer");
+    return 0;
+  }
+  return 1;
+}
+
+double rk_yab_loudness_get(void) {
+  clear_error();
+  if (!rk_gui_ensure_app()) {
+    set_error(rk_gui_last_error());
+    if (!g_error[0]) {
+      set_error("loudness get: the application is not running");
+    }
+    return 0;
+  }
+  BContinuousParameter *gain = NULL;
+  BParameterWeb *web = master_gain_web(&gain);
+  if (!web) {
+    set_error("loudness get: the audio mixer is not available");
+    return 0;
+  }
+  float volume = 0.0f;
+  bigtime_t when = 0;
+  size_t size = sizeof(volume);
+  status_t status = gain->GetValue(&volume, &size, &when);
+  delete web;
+  if (status != B_OK) {
+    set_error("loudness get: the mixer did not answer");
+    return 0;
+  }
+  return (double)volume;
 }
 
 /* ---- dialogs ----------------------------------------------------------- */

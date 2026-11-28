@@ -1,0 +1,52 @@
+// RenkuBASIC GUI test: the audio commands
+// Derived from: yab 1.8.3's `sound play`/`sound stop`/`sound wait`
+//               (YabInterface::Sound, SoundStop, SoundWait) and
+//               `mediasound play`/`mediasound stop` (YabInterface::MediaSound).
+//
+// Nothing here can hear the result, so the test checks what it can: that the
+// commands start a real file, that pausing, resuming and stopping leave no
+// stuck player, and that the mixer answers. A person listens in
+// tests/manual/m0103-audio.yab.
+
+// @requires: audio
+// @data: INTRO.WAV
+
+import harness
+
+// The game kit path. `sound play` returns 1 when the file started.
+r = sound play "INTRO.WAV", 0
+assert_eq(r, 1, "sound play starts a file")
+sleep 0.2
+
+// `sound wait` pauses a playing sound and resumes a paused one; both calls must
+// leave the sound usable, so the stop after them still finds it.
+sound wait 0
+sleep 0.1
+sound wait 0
+sleep 0.1
+sound stop 0
+
+// A looping sound stops the same way.
+r = sound play "INTRO.WAV", 1
+assert_eq(r, 1, "sound play starts a looping file")
+sleep 0.2
+sound stop 0
+
+// The media kit path decodes the same file through a BSoundPlayer.
+m = mediasound play "INTRO.WAV"
+assert_eq(m, 1, "mediasound play starts a file")
+sleep 0.3
+mediasound stop 1
+
+// Stopping what is not playing must not fail either.
+sound stop 0
+mediasound stop 1
+
+// The mixer's master gain is a number; this test only reads it.
+v = loudness get
+assert_true(v >= -200 and v <= 200, "loudness get returns a plausible gain")
+
+assert_true(bfilesize("INTRO.WAV") > 1000, "the sound fixture is there")
+
+print "g0123 done"
+exit 0

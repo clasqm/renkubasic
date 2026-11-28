@@ -180,6 +180,9 @@ void collect_missing_clauses(char *string, char exclude) {
 /* yab's dialogs. `alert` is a command here, `popupmenu` and `filepanel` are
    string functions; all three wait for the user. */
 %token tALERT tFILEPANEL tPOPUPMENU
+/* yab's audio family. `sound` and `mediasound` keep `play`, `stop` and `wait`
+   as keywords after themselves only; `loudness` knows `set` and `get`. */
+%token tSOUND tMEDIASOUND tLOUDNESS tPLAY tSTOP
 
 %token tSIN tASIN tCOS tACOS tTAN tATAN tEXP tLOG
 %token tSQRT tSQR tMYEOF tABS tSIG
@@ -367,6 +370,10 @@ statement:  /* empty */
    yab programs pass (the widget tests do the same). */
   | tLAYOUT string_expression ',' string_expression {add_command(cYABLAYOUT);}
   | tALERT string_expression ',' string_expression ',' string_expression {add_command(cYABALERT);}
+  | tSOUND tSTOP expression {add_command(cYABSOUNDSTOP);}
+  | tSOUND tWAIT expression {add_command(cYABSOUNDWAIT);}
+  | tMEDIASOUND tSTOP expression {add_command(cYABMEDIASOUNDSTOP);}
+  | tLOUDNESS tSET expression {add_command(cYABLOUDNESSSET);}
   | tBUTTON coordinates to coordinates ',' string_expression ',' string_expression ',' string_expression {add_command(cYABBUTTON);}
   | tCHECKBOX coordinates ',' string_expression ',' string_expression ',' expression ',' string_expression {add_command(cYABCHECKBOX);}
   | tCHECKBOX tSET string_expression ',' expression {add_command(cYABCHECKBOXSET);}
@@ -737,6 +744,12 @@ function: tSIN '(' expression ')' {create_function(fSIN);}
   /* `attribute get(name, file)` reads an attribute as a number, so it is a
      numeric function; `attribute get$` above is the string one. */
   | tATTRIBUTE tGET '(' string_expression ',' string_expression ')' {create_function(fYABATTRIBUTEGETNUM);}
+  /* The audio getters. `sound play` and `mediasound play` start a file and
+     return 1, and `loudness get` reads the mixer's master gain, so all three
+     are numeric functions and not string ones. */
+  | tSOUND tPLAY string_expression ',' expression %prec tARGUMENT {create_function(fYABSOUNDPLAY);}
+  | tMEDIASOUND tPLAY string_expression %prec tARGUMENT {create_function(fYABMEDIASOUNDPLAY);}
+  | tLOUDNESS tGET {create_function(fYABLOUDNESSGET);}
   /* The list family's numeric getters: item counts, the selected position
      (1-based, 0 when nothing is selected) and the colour components. */
   | tLISTBOX tCOUNT string_expression %prec tARGUMENT {create_function(fYABLISTBOXCOUNT);}

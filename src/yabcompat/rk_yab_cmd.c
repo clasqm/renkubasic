@@ -573,6 +573,30 @@ void rk_yab_command(struct command *cmd) {
     expect(rk_yab_tooltip(id, text));
     break;
   }
+  /* The audio commands: yab's sound/mediasound stop and wait forms each take an
+     argument naming the sound, which this layer does not need because only one
+     sound plays at a time. */
+  case cYABSOUNDSTOP: {
+    (void)take_number();
+    expect(rk_yab_sound_stop());
+    break;
+  }
+  case cYABSOUNDWAIT: {
+    (void)take_number();
+    expect(rk_yab_sound_pause());
+    break;
+  }
+  case cYABMEDIASOUNDSTOP: {
+    (void)take_number();
+    expect(rk_yab_mediasound_stop());
+    break;
+  }
+  case cYABLOUDNESSSET: {
+    double volume = take_number();
+
+    expect(rk_yab_loudness_set(volume));
+    break;
+  }
   case cYABALERT: {
     char *icon = take_string();
     char *button = take_string();

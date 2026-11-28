@@ -960,6 +960,24 @@ void function(struct command *cmd) /* performs a function */
     break;
   /* yab's dialogs: the label the popup returned, or the path the file panel
      returned ("" when either was dismissed). */
+  /* The audio commands: `sound play` starts a file (looping when the flag is
+     set), `mediasound play` decodes one through the media kit, and `loudness
+     get` reads the mixer's master gain. */
+  case fYABSOUNDPLAY:
+    value = (double)rk_yab_sound_play(a1->pointer, (int)a2->value);
+    rk_yab_check();
+    result = stNUMBER;
+    break;
+  case fYABMEDIASOUNDPLAY:
+    value = (double)rk_yab_mediasound_play(a1->pointer);
+    rk_yab_check();
+    result = stNUMBER;
+    break;
+  case fYABLOUDNESSGET:
+    value = rk_yab_loudness_get();
+    rk_yab_check();
+    result = stNUMBER;
+    break;
   case fYABPOPUPMENU:
     pointer = my_strdup((char *)rk_yab_popupmenu(a1->value, a2->value,
                                                  a3->pointer, a4->pointer));

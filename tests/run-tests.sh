@@ -306,6 +306,27 @@ exit 0'; then
   fi
 fi
 
+# The audio commands need a media kit and a sound device, so they get their own
+# capability: the probe plays the repository's short WAV once and stops it, and
+# reads the mixer's master gain, which is the other half of the family.
+AUDIO_OK=0
+if [ "$IS_RENKU" = "1" ]; then
+  if probe_family audio audio-probe.yab audio-probe.log "r = sound play \"$HERE/INTRO.WAV\", 0
+sound stop 0
+if r <> 1 then
+  exit 1
+endif
+v = loudness get
+if v <> v then
+  exit 1
+endif
+exit 0"; then
+    AUDIO_OK=1
+  else
+    probe_note audio "$SCRATCH/audio-probe.log"
+  fi
+fi
+
 # The yabasic graphic window is a separate capability from yab's widget
 # windows: it can exist before the compatibility layer does.
 GRAPHICS_OK=0
@@ -357,6 +378,7 @@ requirement_met() {
     gui-bitmaps) [ "$BITMAPS_OK" = "1" ] ;;
     graphics) [ "$GRAPHICS_OK" = "1" ] ;;
     attributes) [ "$ATTRIBUTES_OK" = "1" ] ;;
+    audio) [ "$AUDIO_OK" = "1" ] ;;
     pty) [ "$HAS_PTY" = "1" ] ;;
     haiku) case "$OSNAME" in haiku|renkuos) return 0 ;; *) return 1 ;; esac ;;
     ffi)
@@ -429,6 +451,7 @@ echo "  gui-menus   : $([ "$MENUS_OK" = "1" ] && echo available || echo unavaila
 echo "  gui-bitmaps : $([ "$BITMAPS_OK" = "1" ] && echo available || echo unavailable)"
 echo "  graphics    : $([ "$GRAPHICS_OK" = "1" ] && echo available || echo unavailable)"
 echo "  attributes  : $([ "$ATTRIBUTES_OK" = "1" ] && echo available || echo unavailable)"
+echo "  audio       : $([ "$AUDIO_OK" = "1" ] && echo available || echo unavailable)"
 echo "  pty         : $([ "$HAS_PTY" = "1" ] && echo available || echo unavailable)"
 echo
 
@@ -492,9 +515,34 @@ for f in "${FILES[@]}"; do
     fi
   fi
 
+  # @data: one or more files (relative to tests/) that the test reads; they are
+  # copied into the test's own directory, because every test runs in a fresh
+  # scratch directory of its own.
+  data_files=$(directive "$f" "data")
+  data_missing=""
+  for data in $data_files; do
+    case "$data" in
+      /*) data_src="$data" ;;
+      *) data_src="$HERE/$data" ;;
+    esac
+    [ -r "$data_src" ] || data_missing="$data"
+  done
+  if [ -n "$data_missing" ]; then
+    echo "FAIL  $name  (data file '$data_missing' is not readable)"
+    FAIL=$((FAIL + 1))
+    FAILED_NAMES="$FAILED_NAMES $name"
+    continue
+  fi
+
   rundir="$SCRATCH_RUN/$name"
   rm -rf "$rundir"
   mkdir -p "$rundir"
+  for data in $data_files; do
+    case "$data" in
+      /*) cp "$data" "$rundir/" ;;
+      *) cp "$HERE/$data" "$rundir/" ;;
+    esac
+  done
   out="$SCRATCH/$name.out"
   err="$SCRATCH/$name.err"
   : > "$out"

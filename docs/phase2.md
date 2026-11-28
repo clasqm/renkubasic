@@ -232,6 +232,12 @@ like `rk_gui_save_png()`.
   keyboard focus messages per view, not the event queue. Dropped files
   (`_Dropped`) are not reported either, because a yab view is an offscreen
   bitmap here and never receives a drop.
+* **The audio commands play one sound at a time.** `sound` uses the game kit,
+  which plays WAV files (and loops them); `mediasound` plays whatever the media
+  kit can decode, so its formats are the machine's decoders. There is no mixing
+  of several simultaneous sounds, no seeking and no length/position query,
+  because yab has none of those either: its stop and wait commands take an
+  argument they ignore. `loudness` moves the whole mixer, as yab's does.
 * **The dialogs cover yab's common forms.** `alert text$, button$, icon$` is a
   command; yab's five-argument alert *function* (three buttons, returning the
   number of the button pressed) needs five arguments, and the interpreter's
@@ -989,6 +995,76 @@ the next run's business.
 
 What the next Haiku run has to show: GUI 19 / 0 / 0, and the three manual tests
 (`m0100`, `m0101`, `m0102`) running to the end by hand.
+
+**Round 16 (2026-11-28).** The audio commands, and the tests that go with the
+two sound files now in `tests/`.
+
+yab's audio family was missing entirely, so there was nothing for an audio test
+to call. The round ports the commands and then tests them. Notes:
+
+* Five commands and three getters: `sound play file$, loop` and
+  `mediasound play file$` (both functions returning 1 when the file started),
+  `sound stop n`, `sound wait n`, `mediasound stop n`, `loudness set volume` and
+  `loudness get`.
+* Only one sound plays at a time, which is why yab's stop and wait commands take
+  an argument nothing uses: starting a sound stops the previous one.
+* `sound` goes through the game kit -- `BFileGameSound`, which plays WAV files
+  and loops them -- and `sound wait` is yab's pause toggle: it pauses a playing
+  sound and resumes a paused one. `mediasound` goes through the media kit: the
+  first track of the file that decodes to raw audio is fed to a `BSoundPlayer`
+  by its buffer callback, so MP3 and everything else the media kit decodes
+  plays, and the player is told when the track runs out. `loudness` is the audio
+  mixer's `B_MASTER_GAIN` parameter, read and written through its parameter web
+  and clamped by the mixer's own minimum and maximum.
+* The scanner gets the words by trailing context, as the other command families
+  do: `sound`, `mediasound` and `loudness` are keywords, but `play`, `stop` and
+  `wait` only are directly after `sound` or `mediasound`, and only when the word
+  really ends there -- a variable called `stopwatch` still scans as a variable.
+  The shared `get` rule also learned to end a line, because `loudness get` is a
+  getter with no argument at all.
+* `sound play`'s file is a plain path (the game kit takes one), while
+  `mediasound play` needs an `entry_ref` first. A missing file, a file that is
+  not audio, a file with no audio track and a missing audio output are runtime
+  errors naming the command, not a silent zero.
+* The build now links `libgame` and `libmedia` as well as `libbe` and
+  `libtranslation`; CMake fails with a clear message if any of the four is
+  missing.
+
+Tests:
+
+* `tests/gui/g0123-audio.yab` starts the short WAV once, pauses and resumes it,
+  stops it, plays it looping and stops it, plays it through the media kit and
+  stops it, stops both players a second time (stopping nothing must not fail),
+  reads the master gain and checks it is plausible. It cannot hear anything, so
+  it proves the commands run and leave no stuck player, not that the sound is
+  audible.
+* `tests/manual/m0103-audio.yab` is the listening test: it prints seven steps
+  and waits between them, so a person can confirm the WAV plays once, loops,
+  pauses, resumes and stops, and that the MP3 decodes through the media kit.
+  A media kit without an MP3 decoder stops the program at step 6, after the WAV
+  steps have passed.
+* The runner learned two things for these: an `@data:` directive that copies
+  files from `tests/` into the test's own scratch directory (`@data: INTRO.WAV`,
+  or several names), because every test runs in a fresh directory, and an
+  `audio` capability probe that plays `tests/INTRO.WAV` once and reads the
+  master gain. A machine without a sound device reports `SKIP` for the group
+  instead of failing it.
+
+Checked here (Linux, no app_server): the grammar regenerates with the same six
+conflicts; all C sources plus the stub bridges build and link; the CLI suite
+stays at 35 / 0 / 7; `g0123` and `m0103` both run to the end against the stub
+(which answers 1 to the players and 0.5 to the gain), `g0123` failing only its
+fixture check when the WAV is not beside it; the `gui` and `manual` suites skip
+both on the stub as `requires audio`; and `rk_yab.cpp` passes `g++ -fsyntax-only`
+against Haiku's public headers, which is where `BFileGameSound`,
+`BSoundPlayer`, `BMediaFile`/`BMediaTrack` and the parameter web calls were
+checked. Not checked: no sound has been heard here, and the MP3 path depends on
+the media kit's decoder on the run's machine.
+
+What the next Haiku run has to show: GUI **20 / 0 / 0** (the 19 from round 14
+plus `g0123-audio`, or 19 passed and one skipped if the audio probe fails), the
+CLI suite unchanged at 40 / 0 / 2, and `m0103-audio` played by hand with the
+seven steps heard.
 
 Next slice: `mouse message$` and `keyboard message$`, which now have a queue to
 feed.

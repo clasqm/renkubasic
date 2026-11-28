@@ -227,6 +227,9 @@ OR return tOR;
 NOT return tNOT;
 BITNOT return tBITNOT;
 ALERT return tALERT;
+SOUND {BEGIN(YABKEY);return tSOUND;}
+MEDIASOUND {BEGIN(YABKEY);return tMEDIASOUND;}
+LOUDNESS {BEGIN(YABKEY);return tLOUDNESS;}
 FILEPANEL return tFILEPANEL;
 POPUPMENU return tPOPUPMENU;
 EOR return tEOR;
@@ -285,7 +288,9 @@ COLORCONTROL {BEGIN(YABKEY);return tCOLORCONTROL;}
      only when the whole word was written: `text 1, 2, set$` still scans set$
      as a string variable, while `text set "id", "centre"` gets tSET. */
 <YABKEY>SET/[ \t] {BEGIN(INITIAL);return tSET;}
-<YABKEY>GET/[ \t] {BEGIN(INITIAL);return tGET;}
+  /* The newline is part of the class because `loudness get` is a getter with
+     no argument at all, so the word can end the line. */
+<YABKEY>GET/[ \t\n] {BEGIN(INITIAL);return tGET;}
 <YABKEY>ADD/[ \t] {BEGIN(INITIAL);return tADD;}
 <YABKEY>REMOVE/[ \t] {BEGIN(INITIAL);return tREMOVE;}
 <YABKEY>SELECT/[ \t] {BEGIN(INITIAL);return tSELECT;}
@@ -293,6 +298,12 @@ COLORCONTROL {BEGIN(YABKEY);return tCOLORCONTROL;}
 <YABKEY>EXPAND/[ \t] {BEGIN(INITIAL);return tEXPAND;}
 <YABKEY>COLLAPSE/[ \t] {BEGIN(INITIAL);return tCOLLAPSE;}
 <YABKEY>COLUMN/[ \t] {BEGIN(INITIAL);return tCOLUMN;}
+  /* `sound play`, `sound stop`, `sound wait` and `mediasound stop`; the words
+     are keywords only there, and the trailing context keeps a variable such as
+     `stopwatch` out of them. A parenthesis counts as the end of the word, so
+     `sound stop(1)` scans like yab's combined form. */
+<YABKEY>PLAY/[ \t(] {BEGIN(INITIAL);return tPLAY;}
+<YABKEY>STOP/[ \t(] {BEGIN(INITIAL);return tSTOP;}
   /* `clipboard copy` and `clipboard paste$`; yab spells the getter with the
      dollar, and both words are only keywords after `clipboard`. */
 <YABKEY>BITMAP {BEGIN(INITIAL);return tBITMAP;} /* `draw bitmap` */

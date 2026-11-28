@@ -1,0 +1,51 @@
+// RenkuBASIC manual test: what the audio commands sound like
+// Derived from: yab 1.8.3 Examples/MediaSound.yab and Sound.yab.
+//
+// Run with:  tests/run-tests.sh --suite manual --filter m0103
+//
+// A human must confirm, watching the prints as they come:
+//   * step 1 plays the short WAV once and goes quiet at the end
+//   * step 2 loops it, so it is still playing after four seconds
+//   * step 3 pauses it, step 4 resumes it where it stopped
+//   * step 5 stops it, and nothing is left playing
+//   * step 6 plays the MP3 through the media kit (if the media kit has an MP3
+//     decoder; without one the program stops here with that error, after the
+//     WAV steps have already passed)
+//   * the program ends with status 0
+
+// @requires: audio
+// @data: INTRO.WAV Anchors_Aweigh.mp3
+
+print "1. playing INTRO.WAV once"
+r = sound play "INTRO.WAV", 0
+print "   sound play returned ", r
+sleep 3
+
+print "2. playing INTRO.WAV in a loop; it should still sound after 4 seconds"
+r = sound play "INTRO.WAV", 1
+print "   sound play returned ", r
+sleep 4
+
+print "3. paused"
+sound wait 0
+sleep 2
+
+print "4. resumed"
+sound wait 0
+sleep 2
+
+print "5. stopped"
+sound stop 0
+sleep 1
+
+print "6. playing Anchors_Aweigh.mp3 through the media kit"
+m = mediasound play "Anchors_Aweigh.mp3"
+print "   mediasound play returned ", m
+sleep 4
+
+print "7. stopped"
+mediasound stop 1
+
+print "the master gain is ", loudness get
+print "m0103 done"
+exit 0

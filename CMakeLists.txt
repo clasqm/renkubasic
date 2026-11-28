@@ -74,13 +74,19 @@ target_compile_options(renkubasic PRIVATE -Wall
 # BBitmap, BFont) and the translation kit to encode screenshots as PNG.
 find_library(HAIKU_BE_LIBRARY NAMES be)
 find_library(HAIKU_TRANSLATION_LIBRARY NAMES translation)
-if(NOT HAIKU_BE_LIBRARY OR NOT HAIKU_TRANSLATION_LIBRARY)
+# The audio commands use the game kit (`sound`) and the media kit
+# (`mediasound`, `loudness`).
+find_library(HAIKU_GAME_LIBRARY NAMES game)
+find_library(HAIKU_MEDIA_LIBRARY NAMES media)
+if(NOT HAIKU_BE_LIBRARY OR NOT HAIKU_TRANSLATION_LIBRARY
+   OR NOT HAIKU_GAME_LIBRARY OR NOT HAIKU_MEDIA_LIBRARY)
   message(FATAL_ERROR
-    "RenkuBASIC needs the Haiku kits: libbe (application kit) and libtranslation")
+    "RenkuBASIC needs the Haiku kits: libbe, libtranslation, libgame and libmedia")
 endif()
 
 target_link_libraries(renkubasic PRIVATE ${CURSES_LIBRARIES} m
-  ${HAIKU_BE_LIBRARY} ${HAIKU_TRANSLATION_LIBRARY})
+  ${HAIKU_BE_LIBRARY} ${HAIKU_TRANSLATION_LIBRARY} ${HAIKU_GAME_LIBRARY}
+  ${HAIKU_MEDIA_LIBRARY})
 
 # yabasic's man page and HTML manual are replaced by docs/manual in phase 3;
 # until then the original page is installed unchanged so `man renkubasic`
