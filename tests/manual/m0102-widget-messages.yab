@@ -17,7 +17,8 @@
 // @requires: gui
 // @timeout: 600
 
-window open 200, 200 to 700, 520, "rk_msg_win", "RenkuBASIC widget messages"
+// The window has to reach the lowest widget: the list box ends at y = 490.
+window open 200, 200 to 700, 720, "rk_msg_win", "RenkuBASIC widget messages"
 layout "left, top", "rk_msg_win"
 
 view 10, 10 to 460, 220, "rk_msg_view", "rk_msg_win"

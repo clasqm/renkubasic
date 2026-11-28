@@ -1341,6 +1341,7 @@ static void initialize(void)
   cexplanation[cYABTABVIEW] = "YABTABVIEW";
   cexplanation[cYABTABADD] = "YABTABADD";
   cexplanation[cYABTABSET] = "YABTABSET";
+  cexplanation[cYABALERT] = "YABALERT";
   cexplanation[cYABTABREMOVE] = "YABTABREMOVE";
   cexplanation[cYABBOXVIEW] = "YABBOXVIEW";
   cexplanation[cYABBOXVIEWSET] = "YABBOXVIEWSET";
@@ -1538,6 +1539,8 @@ static void initialize(void)
   fexplanation[fYABTABVIEWGET] = "YABTABVIEWGET";
   fexplanation[fYABSTACKVIEWGET] = "YABSTACKVIEWGET";
   fexplanation[fYABSPLITVIEWGET] = "YABSPLITVIEWGET";
+  fexplanation[fYABPOPUPMENU] = "YABPOPUPMENU";
+  fexplanation[fYABFILEPANELLOAD] = "YABFILEPANELLOAD";
   fexplanation[fYABATTRIBUTEGET] = "YABATTRIBUTEGET";
   fexplanation[fYABATTRIBUTEGETNUM] = "YABATTRIBUTEGETNUM";
   fexplanation[fYABBFILESIZE] = "YABBFILESIZE";
@@ -2068,6 +2071,7 @@ static void run_it()
       case cYABOPTIONNUMBER:
       case cYABOPTIONCOLOUR:
       case cYABTOOLTIP:
+      case cYABALERT:
       case cYABTABVIEW:
       case cYABTABADD:
       case cYABTABSET:

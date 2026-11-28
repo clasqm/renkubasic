@@ -27,6 +27,7 @@
       ("the window did not respond"), never a hung program and a hung test.
 */
 
+#include <Alert.h>
 #include <Alignment.h>
 #include <Application.h>
 #include <Bitmap.h>
@@ -36,19 +37,25 @@
 #include <CheckBox.h>
 #include <Clipboard.h>
 #include <ColorControl.h>
+#include <Entry.h>
 #include <File.h>
+#include <FilePanel.h>
 #include <Font.h>
 #include <fs_attr.h> /* attr_info, for the file attribute commands */
 #include <ListItem.h>
 #include <ListView.h>
+#include <Looper.h>
 #include <Menu.h>
 #include <MenuBar.h>
 #include <MenuField.h>
 #include <MenuItem.h>
 #include <Message.h>
+#include <Messenger.h>
 #include <Node.h>
 #include <NodeInfo.h>
+#include <OS.h>
 #include <OutlineListView.h>
+#include <Path.h>
 #include <PopUpMenu.h>
 #include <RadioButton.h>
 #include <ScrollBar.h>
@@ -5229,6 +5236,202 @@ const char *rk_yab_menu_translate(const char *text) {
   /* yab splits a menu key on ':' and translates each part; with no catalog
      every part keeps its text, so the key comes back unchanged. */
   return rk_yab_translate(text);
+}
+
+/* ---- dialogs ----------------------------------------------------------- */
+
+/* yab's `alert`, `popupmenu` and `filepanel` all stop the program until the
+   user answers. They run on the same BApplication the windows use, so each one
+   starts the application first: a program may raise an alert before it opens a
+   window. */
+
+/* yab reads the icon word by a case-insensitive substring, in this order, and
+   falls back to an empty alert. */
+alert_type alert_type_of(const char *option) {
+  if (option_has(option, "info")) {
+    return B_INFO_ALERT;
+  }
+  if (option_has(option, "idea")) {
+    return B_IDEA_ALERT;
+  }
+  if (option_has(option, "warning")) {
+    return B_WARNING_ALERT;
+  }
+  if (option_has(option, "stop")) {
+    return B_STOP_ALERT;
+  }
+  return B_EMPTY_ALERT;
+}
+
+int rk_yab_notice(const char *text, const char *button, const char *icon) {
+  clear_error();
+  if (!rk_gui_ensure_app()) {
+    set_error(rk_gui_last_error());
+    if (!g_error[0]) {
+      set_error("alert: the application is not running");
+    }
+    return 0;
+  }
+  /* Go() blocks until a button is pressed and deletes the alert then, as yab
+     relies on. */
+  (new BAlert("Alert!", text ? text : "",
+              (button && *button) ? button : "Ok", NULL, NULL,
+              B_WIDTH_AS_USUAL, alert_type_of(icon)))
+      ->Go();
+  return 1;
+}
+
+const char *rk_yab_popupmenu(double x, double y, const char *items,
+                             const char *view_name) {
+  static std::string result;
+
+  clear_error();
+  result.clear();
+  float dx = 0.0f;
+  float dy = 0.0f;
+  YabWindow *window = widget_host(view_name, &dx, &dy);
+  if (!window) {
+    return result.c_str();
+  }
+  if (!rk_gui_ensure_app()) {
+    set_error(rk_gui_last_error());
+    if (!g_error[0]) {
+      set_error("popupmenu: the application is not running");
+    }
+    return result.c_str();
+  }
+  /* The menu opens at the point yab names, which is relative to the view (or to
+     the window, whose root view carries the window's name). */
+  if (window->window->LockWithTimeout(100000) != B_OK) {
+    set_error("popupmenu: the window did not respond");
+    return result.c_str();
+  }
+  BPoint where = window->window->ConvertToScreen(
+      BPoint((float)x + dx, (float)y + dy));
+  window->window->Unlock();
+
+  BPopUpMenu *menu = new BPopUpMenu("rk-yab-popup", false, false);
+  menu->SetAsyncAutoDestruct(true);
+  const char *start = items ? items : "";
+  while (true) {
+    const char *bar = strchr(start, '|');
+    size_t length = bar ? (size_t)(bar - start) : strlen(start);
+    if (length > 0) {
+      if (length == 2 && strncmp(start, "--", 2) == 0) {
+        menu->AddItem(new BSeparatorItem());
+      } else {
+        std::string label(start, length);
+        menu->AddItem(new BMenuItem(label.c_str(), NULL));
+      }
+    }
+    if (!bar) {
+      break;
+    }
+    start = bar + 1;
+  }
+  BMenuItem *chosen = menu->Go(where, false, true);
+  if (chosen && chosen->Label()) {
+    result = chosen->Label();
+  }
+  return result.c_str();
+}
+
+/* BFilePanel reports its result as a message, but yab's `filepanel` is a
+   function the program waits on. The panel's target is a looper of our own: it
+   records the chosen path and releases the wait the caller sits in. */
+class YabFilePanelLooper : public BLooper {
+public:
+  YabFilePanelLooper() : BLooper("rk-yab-filepanel"), waiting(-1) {
+    waiting = create_sem(0, "rk-yab-filepanel-wait");
+  }
+
+  ~YabFilePanelLooper() {
+    if (waiting >= 0) {
+      delete_sem(waiting);
+    }
+  }
+
+  void MessageReceived(BMessage *message) {
+    if (message->what == B_REFS_RECEIVED) {
+      entry_ref ref;
+      if (message->FindRef("refs", &ref) == B_OK) {
+        BPath path(&ref);
+        if (path.InitCheck() == B_OK) {
+          chosen = path.Path();
+        }
+      }
+      release_sem(waiting);
+      return;
+    }
+    if (message->what == B_CANCEL) {
+      release_sem(waiting);
+      return;
+    }
+    BLooper::MessageReceived(message);
+  }
+
+  sem_id waiting;
+  BString chosen;
+};
+
+const char *rk_yab_filepanel(const char *mode, const char *title,
+                             const char *directory, const char *filename) {
+  static std::string result;
+
+  clear_error();
+  result.clear();
+  /* yab matches the mode by substring with the longest form last, so
+     "Load-File-and-Directory" wins over "Load-File". */
+  file_panel_mode panel_mode = B_OPEN_PANEL;
+  uint32 flavours = B_FILE_NODE;
+  if (option_has(mode, "save-file")) {
+    panel_mode = B_SAVE_PANEL;
+  } else if (option_has(mode, "load-file-and-directory")) {
+    flavours = B_FILE_NODE | B_DIRECTORY_NODE;
+  } else if (option_has(mode, "load-directory")) {
+    flavours = B_DIRECTORY_NODE;
+  } else if (!option_has(mode, "load-file")) {
+    snprintf(g_error, sizeof(g_error), "filepanel: '%s' is not a panel mode",
+             mode ? mode : "");
+    return result.c_str();
+  }
+  if (!rk_gui_ensure_app()) {
+    set_error(rk_gui_last_error());
+    if (!g_error[0]) {
+      set_error("filepanel: the application is not running");
+    }
+    return result.c_str();
+  }
+  /* BFilePanel has no title of its own; yab's title argument comes from its
+     own panel class, so it is accepted and unused here. */
+  (void)title;
+
+  YabFilePanelLooper *looper = new YabFilePanelLooper();
+  if (looper->Run() != B_OK) {
+    delete looper;
+    set_error("filepanel: could not start the panel");
+    return result.c_str();
+  }
+  BMessenger messenger(looper);
+  BFilePanel *panel =
+      new BFilePanel(panel_mode, &messenger, NULL, flavours, false,
+                     new BMessage(B_REFS_RECEIVED), NULL, false, true);
+  if (directory && *directory) {
+    panel->SetPanelDirectory(directory);
+  }
+  if (panel_mode == B_SAVE_PANEL && filename && *filename) {
+    panel->SetSaveText(filename);
+  }
+  panel->Show();
+  acquire_sem(looper->waiting);
+  panel->Hide();
+  delete panel;
+  if (looper->chosen.Length() > 0) {
+    result = looper->chosen.String();
+  }
+  looper->Lock();
+  looper->Quit();
+  return result.c_str();
 }
 
 /* ---- bitmaps ----------------------------------------------------------- */

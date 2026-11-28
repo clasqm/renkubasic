@@ -37,7 +37,9 @@ while running
       endif
       break
     case "rk_panel_save|"
-      chosen$ = filepanel "Save-File", "Choose a target", "/boot/home", "rk-test.txt"
+      // yab's fourth argument (the name the panel starts with) has no grammar
+      // rule here yet, so the save panel opens with an empty name.
+      chosen$ = filepanel "Save-File", "Choose a target", "/boot/home"
       if chosen$ <> "" then
         draw flush "rk_panel_view"
         draw text 10, 60, "target: " + chosen$, "rk_panel_view"

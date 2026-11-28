@@ -232,6 +232,16 @@ like `rk_gui_save_png()`.
   keyboard focus messages per view, not the event queue. Dropped files
   (`_Dropped`) are not reported either, because a yab view is an offscreen
   bitmap here and never receives a drop.
+* **The dialogs cover yab's common forms.** `alert text$, button$, icon$` is a
+  command; yab's five-argument alert *function* (three buttons, returning the
+  number of the button pressed) needs five arguments, and the interpreter's
+  function dispatch stops at four. `filepanel` takes the mode, the title and the
+  starting directory, but not yab's fourth argument, the name a save panel
+  starts with: after the third string a ',' is ambiguous with the end of the
+  argument list, which would cost a seventh shift/reduce conflict. `BFilePanel`
+  has no title of its own, so the title is accepted and unused. `popupmenu`
+  returns the chosen label; yab offers shortcuts and icons in it, which are not
+  built here.
 * **Only the widget properties the tests need exist.** `option set` knows
   `label`/`text`, `enabled`, `value` and `tooltip`; `option colour` knows
   `bgcolor`, `highcolor` and `lowcolor`; a slider knows `barcolor` and
@@ -873,6 +883,16 @@ What the next Haiku run has to show: GUI 18 / 0 / 0 with `g0121-messages`
 passing (a new window reports `_Activated`), and the CLI suite unchanged at
 40 / 0 / 2.
 
+Accepted on Haiku (2026-11-28): GUI **18 / 0 / 0** with `g0121-messages`
+passing -- a new window does report `_Activated` -- and CLI **40 / 0 / 2**. The
+same run started the three manual tests. `m0102-widget-messages` stopped at its
+radiobutton with "the widget does not fit into its window": the test's window
+was 321 pixels tall and the test's list box ends at y = 490, so the window is
+now 520 pixels tall instead. `m0100-alerts` and `m0101-filepanel-popupmenu`
+stopped at a syntax error, because `alert`, `popupmenu` and `filepanel` were
+never ported; that run was built from a tree that predates round 14 too, so
+`g0122-containers` was not in it. Round 15 is those three commands.
+
 **Round 14 (2026-11-28).** Split view geometry and the container getters.
 
 The three container views had only their creation commands; yab's `set` and
@@ -918,6 +938,57 @@ run's business.
 
 What the next Haiku run has to show: GUI 19 / 0 / 0 with `g0122-containers`
 passing as well as `g0121-messages`, and the CLI suite unchanged at 40 / 0 / 2.
+The run that accepted round 13 was built before this round, so it did not
+include `g0122`; the two rounds are checked together next time.
+
+**Round 15 (2026-11-28).** The three dialogs: `alert`, `popupmenu` and
+`filepanel`.
+
+The three manual tests found them missing. They are the first commands in this
+layer that stop the program until a human answers, which is why they were left
+for a round of their own. Notes:
+
+* `alert text$, button$, icon$` is yab's one-button alert. The icon word is
+  matched anywhere in the string, case-insensitively, in yab's order (info,
+  idea, warning, stop) and anything else is an empty alert. `Go()` blocks until
+  a button is pressed and deletes the alert then, exactly as yab's call relies
+  on.
+* `popupmenu x, y, "item|item|--|item", "view"` builds a `BPopUpMenu`, opens it
+  at the point named -- relative to the view, or to the window when the view is
+  the window's own name -- and returns the chosen label, or "" when the menu was
+  dismissed. "--" is a separator, as in yab. The window is locked only long
+  enough to convert the point to screen coordinates, so the menu's own loop is
+  never run under the window lock.
+* `filepanel mode$, title$, directory$` returns the chosen path or "" when the
+  panel was cancelled. `BFilePanel` only reports by message, so the target is a
+  looper of our own that records the path and releases a semaphore the caller
+  waits on; `B_CANCEL` releases it with an empty answer. The mode is yab's,
+  matched by substring with the longest form first, so "Load-File-and-Directory"
+  is not read as "Load-File".
+* The three of them start the application themselves, because a program may
+  raise an alert before it opens a window.
+* Two yab forms are not in the grammar, both for the same reason: they would
+  mean a seventh shift/reduce conflict (the grammar is pinned at six). yab's
+  five-argument `alert` *function* (`alert text, b1, b2, b3, icon` returning the
+  button number) needs five arguments and the interpreter's function dispatch
+  stops at four. yab's four-argument `filepanel` (the name a save panel starts
+  with) puts a ',' where the three-argument form reduces, so it is genuinely
+  ambiguous; `popupmenu` and the two `filepanel` forms above are unaffected.
+  See the gaps list.
+
+Checked here (Linux, no app_server): the grammar regenerates with the same six
+conflicts (the four-argument `filepanel` rule was tried and removed for this
+reason); all C sources plus the stub bridges build and link; a probe script with
+`alert`, both `filepanel` forms and `popupmenu` parses and runs against the stub
+(which answers 1 and ""); the CLI suite stays at 35 / 0 / 7; `g0122` still runs
+green; and `rk_yab.cpp` passes `g++ -fsyntax-only` against Haiku's public
+headers, which is where `BAlert`, `BFilePanel`, `BPopUpMenu::Go` and the
+`create_sem`/`BMessenger` calls were checked. Not checked: app_server -- no alert
+has been pressed, no popup opened and no panel shown here, so a real click is
+the next run's business.
+
+What the next Haiku run has to show: GUI 19 / 0 / 0, and the three manual tests
+(`m0100`, `m0101`, `m0102`) running to the end by hand.
 
 Next slice: `mouse message$` and `keyboard message$`, which now have a queue to
 feed.

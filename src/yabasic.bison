@@ -177,6 +177,9 @@ void collect_missing_clauses(char *string, char exclude) {
 /* Bitmaps: `bitmap w, h, name`, `bitmap get id, option, arg`,
    `bitmap remove id` and `draw bitmap x, y, id, mode, view`. */
 %token tBITMAP
+/* yab's dialogs. `alert` is a command here, `popupmenu` and `filepanel` are
+   string functions; all three wait for the user. */
+%token tALERT tFILEPANEL tPOPUPMENU
 
 %token tSIN tASIN tCOS tACOS tTAN tATAN tEXP tLOG
 %token tSQRT tSQR tMYEOF tABS tSIG
@@ -363,6 +366,7 @@ statement:  /* empty */
    lives in; the window's own root view carries the window's name, which is what
    yab programs pass (the widget tests do the same). */
   | tLAYOUT string_expression ',' string_expression {add_command(cYABLAYOUT);}
+  | tALERT string_expression ',' string_expression ',' string_expression {add_command(cYABALERT);}
   | tBUTTON coordinates to coordinates ',' string_expression ',' string_expression ',' string_expression {add_command(cYABBUTTON);}
   | tCHECKBOX coordinates ',' string_expression ',' string_expression ',' expression ',' string_expression {add_command(cYABCHECKBOX);}
   | tCHECKBOX tSET string_expression ',' expression {add_command(cYABCHECKBOXSET);}
@@ -569,6 +573,10 @@ string_function: tLEFT '(' string_expression ',' expression ')' {create_function
      control or a text edit is only useful if the program can. */
   | tTEXTCONTROL tGET string_expression {create_function(fYABTEXTCONTROLGET);}
   | tTEXTEDIT tGET string_expression {create_function(fYABTEXTEDITGET);}
+  /* yab's dialogs that return text: the popup's chosen label and the file
+     panel's chosen path. The panel takes a suggested name only when it saves. */
+  | tPOPUPMENU coordinates ',' string_expression ',' string_expression %prec tARGUMENT {create_function(fYABPOPUPMENU);}
+  | tFILEPANEL string_expression ',' string_expression ',' string_expression %prec tARGUMENT {create_function(fYABFILEPANELLOAD);}
   /* The list family's string getters. `get$` returns the item text; the plain
      `get` a few lines down in big_function returns the selected position, as
      in yab. calendar get returns the date string, so it belongs here too. */

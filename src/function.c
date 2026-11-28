@@ -958,6 +958,21 @@ void function(struct command *cmd) /* performs a function */
     rk_yab_check();
     result = stNUMBER;
     break;
+  /* yab's dialogs: the label the popup returned, or the path the file panel
+     returned ("" when either was dismissed). */
+  case fYABPOPUPMENU:
+    pointer = my_strdup((char *)rk_yab_popupmenu(a1->value, a2->value,
+                                                 a3->pointer, a4->pointer));
+    rk_yab_check();
+    result = stSTRING;
+    break;
+  case fYABFILEPANELLOAD:
+    pointer =
+        my_strdup((char *)rk_yab_filepanel(a1->pointer, a2->pointer,
+                                           a3->pointer, ""));
+    rk_yab_check();
+    result = stSTRING;
+    break;
   case fYABDRAWGET:
     value = rk_yab_view_get(a1->pointer, a2->pointer);
     rk_yab_check();

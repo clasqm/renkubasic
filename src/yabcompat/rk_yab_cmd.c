@@ -573,6 +573,14 @@ void rk_yab_command(struct command *cmd) {
     expect(rk_yab_tooltip(id, text));
     break;
   }
+  case cYABALERT: {
+    char *icon = take_string();
+    char *button = take_string();
+    char *text = take_string();
+
+    expect(rk_yab_notice(text, button, icon));
+    break;
+  }
   case cYABTABVIEW: {
     char *view = take_string();
     char *side = take_string();

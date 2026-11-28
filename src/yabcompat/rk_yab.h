@@ -362,6 +362,31 @@ const char *rk_yab_menu_translate(const char *text);
 /* `message$`: every widget event collected since the last call. */
 const char *rk_yab_message(void);
 
+/* ---- dialogs ----------------------------------------------------------- */
+
+/* `alert text$, button$, icon$`: yab's one-button alert. The icon is matched
+   as a word anywhere in the string -- "info", "idea", "warning", "stop",
+   anything else for an empty alert. The call waits for the button, as yab's
+   does. */
+int rk_yab_notice(const char *text, const char *button, const char *icon);
+
+/* `win$ = popupmenu x, y, "item|item|--|item", "view"`: the label of the entry
+   the user picked, or "" when the menu was dismissed. The point is relative to
+   the view, or to the window when the view is the window's own name. The
+   string is owned by the bridge until the next call. */
+const char *rk_yab_popupmenu(double x, double y, const char *items,
+                             const char *view);
+
+/* `filepanel mode$, title$, directory$`: the path the user chose, or "" when
+   the panel was cancelled. The mode is yab's, matched as a word anywhere in
+   the string: "Load-File", "Save-File", "Load-Directory" or
+   "Load-File-and-Directory". `filename` is the name a save panel starts with;
+   the grammar has no fourth argument for it (see docs/phase2.md), so it passes
+   "". The title is accepted and unused, because BFilePanel has no title of its
+   own. The string is owned by the bridge until the next call. */
+const char *rk_yab_filepanel(const char *mode, const char *title,
+                             const char *directory, const char *filename);
+
 /* ---- bitmaps ----------------------------------------------------------- */
 
 /* `bitmap w, h, id`: an offscreen B_RGBA32 bitmap of that size, cleared to
